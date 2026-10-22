@@ -4,21 +4,21 @@ import Link from "next/link";
 import { ArrowRight, Check, Flame } from "lucide-react";
 import { AvatarStack } from "@/components/ui/Avatar";
 import { buttonStyles } from "@/components/ui/Button";
-import { PROMPTS, SAMPLE_STREAK, TODAY_ANSWERED_COUNT, TODAY_PROMPT_ID } from "@/lib/sample-data";
-import { useVybz } from "@/lib/store";
-import type { User } from "@/lib/types";
+import { useDailyVibe } from "@/lib/hooks/usePosts";
+import { pluralize } from "@/lib/utils";
 
 /** Today's shared prompt. The daily reason to open the app. */
 export function DailyVibeCard() {
-  const { me, posts, getUser } = useVybz();
-  const prompt = PROMPTS.find((p) => p.id === TODAY_PROMPT_ID)!;
-  const todaysPosts = posts.filter((post) => post.promptId === TODAY_PROMPT_ID);
-  const postedToday = todaysPosts.some((post) => post.authorId === me.id);
-  const answeredBy = todaysPosts
-    .filter((post) => post.authorId !== me.id)
-    .map((post) => getUser(post.authorId))
-    .filter((user): user is User => Boolean(user));
-  const streak = SAMPLE_STREAK + (postedToday ? 1 : 0);
+  const { status, vibe } = useDailyVibe();
+
+  if (status === "loading") {
+    return <div className="h-48 animate-pulse rounded-[28px] border border-brand/25 bg-surface" role="status" aria-label="Loading today's vibe" />;
+  }
+  // No prompt at all (or it failed to load): the feed is still usable, so stay quiet.
+  if (!vibe?.prompt) return null;
+
+  const { prompt, answeredBy, postedToday, streak, isToday } = vibe;
+  const answered = answeredBy.length + (postedToday ? 1 : 0);
 
   return (
     <section
@@ -36,11 +36,11 @@ export function DailyVibeCard() {
         <div className="flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-brand-soft">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-soft" />
-            Today&apos;s Vibe
+            {isToday ? "Today's Vibe" : "Latest Vibe"}
           </span>
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning">
             <Flame className="h-3.5 w-3.5" aria-hidden />
-            {streak}-day streak
+            {streak > 0 ? `${streak}-day streak` : "Post today to start a streak"}
           </span>
         </div>
 
@@ -53,10 +53,16 @@ export function DailyVibeCard() {
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 text-sm text-muted">
-            <AvatarStack users={answeredBy} max={4} size="sm" />
+            {answeredBy.length > 0 && <AvatarStack users={answeredBy} max={4} size="sm" />}
             <span>
-              <span className="font-semibold text-fg">{TODAY_ANSWERED_COUNT + (postedToday ? 1 : 0)}</span> friends
-              answered
+              {answered === 0 ? (
+                "Be the first in your circles to answer"
+              ) : (
+                <>
+                  <span className="font-semibold text-fg">{pluralize(answered, "person", "people")}</span> in your circles
+                  answered
+                </>
+              )}
             </span>
           </div>
           {postedToday ? (
@@ -65,7 +71,7 @@ export function DailyVibeCard() {
               You&apos;re in for today
             </span>
           ) : (
-            <Link href="/post" className={buttonStyles()}>
+            <Link href={`/post?prompt=${prompt.id}`} className={buttonStyles()}>
               Share your vibe
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>

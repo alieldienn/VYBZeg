@@ -2,20 +2,23 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
+import { Tag } from "@/components/ui/DemoNotice";
 import { PLAN_CATEGORIES } from "@/lib/constants";
 import { useVybz } from "@/lib/store";
 import { leadingOption, optionVotes, totalVotes } from "@/lib/utils";
 
 /** Desktop-only right column on Home: open plans and circles at a glance. */
 export function HomeAside() {
-  const { polls, circles, getCircle } = useVybz();
+  const { polls, circles, social, getCircle } = useVybz();
   const openPolls = polls.filter((poll) => poll.status === "open").slice(0, 3);
 
   return (
     <aside className="sticky top-8 hidden space-y-5 self-start xl:block">
       <section className="rounded-[28px] border border-line bg-surface p-5">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">Plans brewing</h2>
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
+            Plans brewing <Tag>Sample</Tag>
+          </h2>
           <Link href="/plans" className="text-xs font-medium text-brand-soft hover:underline">
             See all
           </Link>
@@ -50,7 +53,8 @@ export function HomeAside() {
             See all
           </Link>
         </div>
-        {circles.length === 0 && (
+        {social.status === "loading" && <div className="mt-3 h-24 animate-pulse rounded-2xl bg-elevated" role="status" aria-label="Loading circles" />}
+        {social.status !== "loading" && circles.length === 0 && (
           <p className="mt-3 text-sm text-muted">
             No circles yet.{" "}
             <Link href="/circles" className="font-medium text-brand-soft hover:underline">

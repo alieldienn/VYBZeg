@@ -5,6 +5,7 @@
  * rules (supabase/migrations) decide what is allowed. The checks here are only
  * for friendly messages; they are not the security.
  */
+import { cairoDay, daysAgoIso, streakFrom } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { profileToUser } from "@/lib/supabase/avatars";
 import { failure, type Result } from "@/lib/supabase/errors";
@@ -50,6 +51,17 @@ export async function fetchSocial(userId: string): Promise<Result<{ data?: Socia
     : { data: [], error: null };
   if (circleRows.error) return failure(circleRows.error, "We couldn't load your circles.");
 
+  // Recent posts (just who/where/when) for "new today", streaks and activity.
+  const recentPosts = circleIds.length
+    ? await supabase
+        .from("posts")
+        .select("circle_id, author_id, created_at")
+        .gte("created_at", daysAgoIso(STATS_DAYS))
+        .order("created_at", { ascending: false })
+        .limit(2000)
+    : { data: [], error: null };
+  if (recentPosts.error) return failure(recentPosts.error, "We couldn't load your circles.");
+
   // Friends and requests. A request the other person declined still looks
   // "sent" to you, so declining isn't announced to the sender.
   const friendIds: string[] = [];
@@ -62,7 +74,10 @@ export async function fetchSocial(userId: string): Promise<Result<{ data?: Socia
     else if (f.status === "pending") requests.push({ userId: otherId, direction: "incoming", createdAt: f.created_at });
   }
 
-  const circles = (circleRows.data ?? []).map(toCircle);
+  const today = cairoDay();
+  const circles = (circleRows.data ?? []).map((row) =>
+    toCircle(row, (recentPosts.data ?? []).filter((post) => post.circle_id === row.id), today),
+  );
   const circleInvites: CircleInvite[] = (invites.data ?? [])
     .filter((invite) => invite.circles)
     .map((invite) => ({
@@ -106,20 +121,37 @@ type CircleRow = {
 
 const ROLE_ORDER: Record<CircleRole, number> = { owner: 0, admin: 1, member: 2 };
 
-function toCircle(row: CircleRow): Circle {
+/** Posts from the last few weeks only feed the stats; older posts don't affect them. */
+const STATS_DAYS = 35;
+
+type RecentPost = { circle_id: string; author_id: string; created_at: string };
+
+function toCircle(row: CircleRow, posts: RecentPost[], today: string): Circle {
   const members = [...row.circle_members].sort(
     (a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.joined_at.localeCompare(b.joined_at),
   );
-  // Real activity for now: who created and joined the circle (posts and plans join later).
-  const activity: CircleActivity[] = [...row.circle_members]
-    .sort((a, b) => b.joined_at.localeCompare(a.joined_at))
-    .map((m) => ({
+  // Activity: who created/joined the circle, plus the latest posts (newest first).
+  const events = [
+    ...row.circle_members.map((m) => ({
       id: `join-${m.user_id}`,
       userId: m.user_id,
-      kind: "join",
+      kind: "join" as const,
       text: m.role === "owner" ? "created the circle" : "joined the circle",
-      timeLabel: timeAgo(m.joined_at),
-    }));
+      at: m.joined_at,
+    })),
+    ...posts.slice(0, 8).map((p, index) => ({
+      id: `post-${index}-${p.created_at}`,
+      userId: p.author_id,
+      kind: "post" as const,
+      text: "shared a vibe",
+      at: p.created_at,
+    })),
+  ];
+  const activity: CircleActivity[] = events
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 10)
+    .map(({ at, ...event }) => ({ ...event, timeLabel: timeAgo(at) }));
+  const postDays = posts.map((p) => cairoDay(p.created_at));
 
   return {
     id: row.id,
@@ -132,8 +164,8 @@ function toCircle(row: CircleRow): Circle {
     roles: Object.fromEntries(row.circle_members.map((m) => [m.user_id, m.role])),
     invites: row.circle_invites.map((i) => ({ id: i.id, inviteeId: i.invitee_id, inviterId: i.inviter_id })),
     activity,
-    streak: 0,
-    newToday: 0,
+    streak: streakFrom(postDays, today),
+    newToday: postDays.filter((day) => day === today).length,
   };
 }
 

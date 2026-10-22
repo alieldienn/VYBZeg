@@ -28,6 +28,8 @@ import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Tag } from "@/components/ui/DemoNotice";
 import { REACTIONS, THEME_GRADIENTS } from "@/lib/constants";
 import { acceptInvite, cancelInvite, deleteCircle, leaveCircle, removeMember } from "@/lib/social";
+import { daysAgoIso } from "@/lib/dates";
+import { usePosts } from "@/lib/hooks/usePosts";
 import { useVybz } from "@/lib/store";
 import type { ActivityKind, Circle, CircleInvite, CircleRole, ReactionKey, User } from "@/lib/types";
 import { agoText, cn, pluralize, reactionCount } from "@/lib/utils";
@@ -126,22 +128,25 @@ type Confirm = { kind: "leave" } | { kind: "delete" } | { kind: "remove"; member
 
 function MemberView({ circle }: { circle: Circle }) {
   const router = useRouter();
-  const { me, getUser, posts, polls, runSocial } = useVybz();
+  const { me, getUser, polls, runSocial } = useVybz();
   const [inviting, setInviting] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const feed = usePosts({ circleId: circle.id });
 
   const myRole = circle.roles?.[me.id] ?? "member";
   const isAdmin = myRole === "owner" || myRole === "admin";
   const members = circle.memberIds.map(getUser).filter((u): u is User => Boolean(u));
-  // Sample posts/polls until Stages 6–7; demo posts you make to this circle appear here too.
-  const circlePosts = posts.filter((post) => post.circleId === circle.id);
+  // Polls are sample data until Stage 7.
   const circlePolls = polls.filter((poll) => poll.circleId === circle.id);
 
+  // "This week" numbers from the loaded posts of the last 7 days.
+  const weekAgo = daysAgoIso(7);
+  const weekPosts = feed.posts.filter((post) => post.createdAt >= weekAgo);
   const reactionTotals = REACTIONS.map((r) => ({
     ...r,
-    total: circlePosts.reduce((sum, post) => sum + reactionCount(post, r.key as ReactionKey), 0),
+    total: weekPosts.reduce((sum, post) => sum + reactionCount(post, r.key as ReactionKey), 0),
   }));
   const topReaction = reactionTotals.reduce((best, r) => (r.total > best.total ? r : best), reactionTotals[0]);
 
@@ -205,7 +210,7 @@ function MemberView({ circle }: { circle: Circle }) {
               <UserPlus className="h-4 w-4" />
               Invite friends
             </Button>
-            <Link href="/post" className={buttonStyles({ variant: "glass" })}>
+            <Link href={`/post?circle=${circle.id}`} className={buttonStyles({ variant: "glass" })}>
               <PenLine className="h-4 w-4" />
               Post
             </Link>
@@ -228,7 +233,7 @@ function MemberView({ circle }: { circle: Circle }) {
               <Tag tone="soon">Weekly Recap preview</Tag>
             </div>
             <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
-              <Stat label="Vibes shared" value={String(circlePosts.length)} />
+              <Stat label="Vibes shared" value={feed.status === "ready" ? `${weekPosts.length}${feed.hasMore && weekPosts.length === feed.posts.length ? "+" : ""}` : "–"} />
               <Stat label="Plans made" value={String(circlePolls.length)} />
               <Stat label="Top reaction" value={topReaction.total > 0 ? topReaction.emoji : "–"} />
             </dl>
@@ -254,17 +259,34 @@ function MemberView({ circle }: { circle: Circle }) {
             <h2 id="circle-posts" className="mb-3 font-display text-lg font-semibold">
               Shared in {circle.name}
             </h2>
-            {circlePosts.length > 0 ? (
+            {feed.status === "loading" ? (
+              <div className="h-80 animate-pulse rounded-[28px] bg-surface" role="status" aria-label="Loading vibes" />
+            ) : feed.status === "error" ? (
+              <div className="rounded-[28px] border border-danger/30 bg-danger/[0.06] px-6 py-8 text-center" role="alert">
+                <p className="text-sm text-muted">{feed.error}</p>
+                <Button variant="secondary" size="sm" className="mt-3" onClick={feed.retry}>
+                  Try again
+                </Button>
+              </div>
+            ) : feed.posts.length > 0 ? (
               <div className="space-y-4">
-                {circlePosts.map((post) => (
-                  <PostCard key={post.id} post={post} />
+                {feed.posts.map((post) => (
+                  <PostCard key={post.id} post={post} onChange={feed.updatePost} onRemove={feed.removePost} />
                 ))}
+                {feed.hasMore && (
+                  <div className="flex justify-center">
+                    <Button variant="secondary" onClick={feed.loadMore} disabled={feed.loadingMore}>
+                      {feed.loadingMore && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+                      Load more
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="rounded-[28px] border border-dashed border-line-strong px-6 py-10 text-center">
                 <p className="font-semibold">No vibes here yet</p>
-                <p className="mt-1 text-sm text-muted">Post something and pick this circle as the audience.</p>
-                <Link href="/post" className={buttonStyles({ size: "sm", className: "mt-4" })}>
+                <p className="mt-1 text-sm text-muted">Be the first to share something with {circle.name}.</p>
+                <Link href={`/post?circle=${circle.id}`} className={buttonStyles({ size: "sm", className: "mt-4" })}>
                   Post a vibe
                 </Link>
               </div>

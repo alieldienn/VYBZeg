@@ -24,26 +24,44 @@ export type Prompt = {
   id: string;
   emoji: string;
   text: string;
+  /** The Cairo day this prompt is "today's", e.g. "2026-10-22". */
+  activeDate?: string;
 };
 
 export type Post = {
   id: string;
   authorId: string;
-  /** null means "all friends". */
+  /** The circle it was shared in. Only null in the composer before one is picked. */
   circleId: string | null;
   promptId: string | null;
+  /** The prompt it answers, if any (loaded with the post). */
+  prompt?: { emoji: string; text: string };
   kind: "photo" | "text";
+  /** Short-lived signed link to the photo (or a local preview link in the composer). */
   imageUrl?: string;
+  /** Where the photo lives in private storage (needed to delete it). */
+  imagePath?: string;
   /** Caption for photo posts, or the main text for text posts. */
   text: string;
   /** Background for text posts. */
   background?: ThemeColor;
   location?: string;
-  /** Pre-formatted time, e.g. "2h". Becomes a real timestamp with the backend. */
+  /** When it was posted (ISO time). */
+  createdAt: string;
+  /** Short age label, e.g. "2h". */
   timeLabel: string;
   /** Reaction counts from other people. The current user's reaction is stored separately. */
   reactions: Record<ReactionKey, number>;
   myReaction: ReactionKey | null;
+  commentCount: number;
+};
+
+export type Comment = {
+  id: string;
+  postId: string;
+  authorId: string;
+  text: string;
+  createdAt: string;
 };
 
 export type ActivityKind = "post" | "plan" | "join" | "react";

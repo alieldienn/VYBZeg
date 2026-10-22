@@ -8,14 +8,14 @@ import { useFormStatus } from "react-dom";
 import { Bell, Camera, Flame, Globe2, Loader2, LogOut, MapPin, Palette, PenLine, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonStyles } from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DemoNotice";
 import { Segmented } from "@/components/ui/Segmented";
 import { Switch } from "@/components/ui/Switch";
 import { signOut } from "@/lib/auth/actions";
 import { REMINDER_TIMES, THEME_GRADIENTS } from "@/lib/constants";
 import { setAvatar } from "@/lib/profile/actions";
-import { SAMPLE_STREAK, TODAY_PROMPT_ID } from "@/lib/sample-data";
+import { useDailyVibe, usePosts } from "@/lib/hooks/usePosts";
 import { useVybz } from "@/lib/store";
 import { deleteAvatar, uploadAvatar } from "@/lib/supabase/uploads";
 import { cn } from "@/lib/utils";
@@ -23,15 +23,14 @@ import { EditProfileSheet } from "./EditProfileSheet";
 
 export function ProfileView() {
   const router = useRouter();
-  const { me, userId, email, posts, circles, friendIds, requests, social, settings, updateSettings, updateProfile, showToast } =
+  const { me, userId, email, circles, friendIds, requests, social, settings, updateSettings, updateProfile, showToast } =
     useVybz();
   const [editing, setEditing] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const photoInput = useRef<HTMLInputElement>(null);
 
-  // Posts are sample data until Stage 6; circles are real.
-  const myPosts = posts.filter((post) => post.authorId === me.id);
-  const postedToday = myPosts.some((post) => post.promptId === TODAY_PROMPT_ID);
+  const myPosts = usePosts({ authorId: me.id });
+  const { vibe } = useDailyVibe();
   const myCircles = circles.filter((circle) => circle.memberIds.includes(me.id));
   const socialReady = social.status === "ready";
   const incoming = requests.filter((r) => r.direction === "incoming").length;
@@ -130,8 +129,8 @@ export function ProfileView() {
           )}
 
           <dl className="mt-6 grid grid-cols-4 gap-2 text-center">
-            <Stat value={myPosts.length} label="Vibes" />
-            <Stat value={SAMPLE_STREAK + (postedToday ? 1 : 0)} label="Streak" icon={<Flame className="h-4 w-4 text-warning" aria-hidden />} />
+            <Stat value={vibe ? vibe.postCount : "–"} label="Vibes" />
+            <Stat value={vibe ? vibe.streak : "–"} label="Streak" icon={<Flame className="h-4 w-4 text-warning" aria-hidden />} />
             <Stat value={socialReady ? myCircles.length : "–"} label="Circles" href="/circles" />
             <Stat
               value={socialReady ? friendIds.length : "–"}
@@ -139,28 +138,52 @@ export function ProfileView() {
               href="/friends"
             />
           </dl>
-          <p className="mt-2 text-center text-[11px] text-subtle">
-            Vibes and streak show sample data until posting is connected.
-          </p>
         </div>
       </section>
 
       <section aria-labelledby="my-vibes" className="mt-8">
-        <h2 id="my-vibes" className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
-          Your vibes <Tag>Sample</Tag>
+        <h2 id="my-vibes" className="mb-3 font-display text-lg font-semibold">
+          Your vibes
         </h2>
+        {myPosts.status === "loading" && (
+          <div className="grid grid-cols-3 gap-2 sm:gap-3" role="status" aria-label="Loading your vibes">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="aspect-[4/5] animate-pulse rounded-2xl bg-surface" />
+            ))}
+          </div>
+        )}
+        {myPosts.status === "error" && (
+          <p className="text-sm text-danger" role="alert">
+            {myPosts.error}{" "}
+            <button type="button" onClick={myPosts.retry} className="font-medium underline">
+              Try again
+            </button>
+          </p>
+        )}
+        {myPosts.status === "ready" && myPosts.posts.length === 0 && (
+          <div className="rounded-[28px] border border-dashed border-line-strong px-6 py-10 text-center">
+            <p className="font-semibold">No vibes yet</p>
+            <p className="mt-1 text-sm text-muted">What you share in your circles shows up here, just for you.</p>
+            <Link href="/post" className={buttonStyles({ size: "sm", className: "mt-4" })}>
+              Post your first vibe
+            </Link>
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {myPosts.map((post) =>
-            post.kind === "photo" && post.imageUrl ? (
+          {myPosts.posts.map((post) =>
+            post.kind === "photo" ? (
               <div key={post.id} className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-elevated">
-                <Image
-                  src={post.imageUrl}
-                  alt={post.text || "Your photo"}
-                  fill
-                  sizes="(min-width: 768px) 240px, 33vw"
-                  unoptimized={post.imageUrl.startsWith("blob:")}
-                  className="object-cover"
-                />
+                {post.imageUrl && (
+                  // Private signed link: loaded directly, not copied into Next.js's image cache.
+                  <Image
+                    src={post.imageUrl}
+                    alt={post.text || "Your photo"}
+                    fill
+                    sizes="(min-width: 768px) 240px, 33vw"
+                    unoptimized
+                    className="object-cover"
+                  />
+                )}
               </div>
             ) : (
               <div
@@ -176,6 +199,14 @@ export function ProfileView() {
             ),
           )}
         </div>
+        {myPosts.hasMore && (
+          <div className="mt-4 flex justify-center">
+            <Button variant="secondary" size="sm" onClick={myPosts.loadMore} disabled={myPosts.loadingMore}>
+              {myPosts.loadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+              Load more
+            </Button>
+          </div>
+        )}
       </section>
 
       <div className="mt-10 space-y-6">

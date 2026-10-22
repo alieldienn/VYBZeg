@@ -8,17 +8,19 @@
  *    Supabase in the browser (Row Level Security decides what you can see) and
  *    reloaded after every change.
  *  - "Reduce motion" is remembered on this device (localStorage).
- *  - Posts and polls are still SAMPLE data held in memory (refreshing resets
- *    them) until their stage is connected. The sample "me" has been swapped for
- *    your real account, and the sample circles they mention are kept only so
- *    those posts and polls can still show a circle name.
+ *  - Posts, reactions and comments are REAL, but not kept here: each screen
+ *    loads its own list (see usePosts). `postsVersion` tells those lists to
+ *    reload after you post something.
+ *  - Polls are still SAMPLE data held in memory (refreshing resets them) until
+ *    Stage 7. The sample "me" has been swapped for your real account, and the
+ *    sample circles they mention are kept only to label those polls.
  */
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
-import { CURRENT_USER_ID, DEFAULT_SETTINGS, SAMPLE_CIRCLES, SAMPLE_POLLS, SAMPLE_POSTS, SAMPLE_USERS } from "./sample-data";
+import { CURRENT_USER_ID, DEFAULT_SETTINGS, SAMPLE_CIRCLES, SAMPLE_POLLS, SAMPLE_USERS } from "./sample-data";
 import { fetchSocial, type SocialData } from "./social";
 import type { Result } from "./supabase/errors";
-import type { Circle, CircleInvite, FriendRequest, Poll, Post, ReactionKey, Settings, User } from "./types";
+import type { Circle, CircleInvite, FriendRequest, Poll, Settings, User } from "./types";
 
 export type ToastTone = "success" | "error";
 
@@ -26,7 +28,8 @@ type Toast = { id: number; message: string; tone: ToastTone };
 
 type State = {
   users: User[];
-  posts: Post[];
+  /** Goes up by one whenever posts change, so lists know to reload. */
+  postsVersion: number;
   /** Your real circles. */
   circles: Circle[];
   /** Sample circles, only for labelling sample posts and polls. */
@@ -42,8 +45,8 @@ type State = {
 };
 
 type Action =
-  | { type: "react"; postId: string; reaction: ReactionKey }
-  | { type: "addPost"; post: Post }
+  | { type: "postsChanged" }
+  | { type: "mergeUsers"; users: User[] }
   | { type: "vote"; pollId: string; optionId: string }
   | { type: "addPoll"; poll: Poll }
   | { type: "closePoll"; pollId: string }
@@ -56,17 +59,21 @@ type Action =
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case "react":
+    case "postsChanged":
+      return { ...state, postsVersion: state.postsVersion + 1 };
+    case "mergeUsers": {
+      if (!action.users.length) return state;
+      // Newer copies replace older ones (profile edits are saved to Supabase first, so this is safe).
+      const fresh = new Map(action.users.map((user) => [user.id, user]));
+      const known = new Set(state.users.map((user) => user.id));
       return {
         ...state,
-        posts: state.posts.map((post) =>
-          post.id === action.postId
-            ? { ...post, myReaction: post.myReaction === action.reaction ? null : action.reaction }
-            : post,
-        ),
+        users: [
+          ...state.users.map((user) => fresh.get(user.id) ?? user),
+          ...action.users.filter((user) => !known.has(user.id)),
+        ],
       };
-    case "addPost":
-      return { ...state, posts: [action.post, ...state.posts] };
+    }
     case "vote":
       return {
         ...state,
@@ -119,7 +126,7 @@ function initialState({ me }: { me: User }): State {
   const swap = (id: string) => (id === CURRENT_USER_ID ? me.id : id);
   return {
     users: SAMPLE_USERS.map((user) => (user.id === CURRENT_USER_ID ? me : user)),
-    posts: SAMPLE_POSTS.map((post) => ({ ...post, authorId: swap(post.authorId) })),
+    postsVersion: 0,
     polls: SAMPLE_POLLS.map((poll) => ({
       ...poll,
       creatorId: swap(poll.creatorId),
@@ -159,8 +166,10 @@ type VybzContextValue = State & {
    * your session expired); on success shows `success` and reloads. Returns true on success.
    */
   runSocial: (change: Promise<Result>, success?: string) => Promise<boolean>;
-  react: (postId: string, reaction: ReactionKey) => void;
-  addPost: (post: Post) => void;
+  /** Tell every post list to reload (after posting or deleting). */
+  postsChanged: () => void;
+  /** Remember profiles that came back with posts or comments (authors). */
+  mergeUsers: (users: User[]) => void;
   vote: (pollId: string, optionId: string) => void;
   addPoll: (poll: Poll) => void;
   closePoll: (pollId: string) => void;
@@ -182,6 +191,9 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
     (message: string, tone: ToastTone = "success") => dispatch({ type: "toast", message, tone }),
     [],
   );
+
+  const postsChanged = useCallback(() => dispatch({ type: "postsChanged" }), []);
+  const mergeUsers = useCallback((users: User[]) => dispatch({ type: "mergeUsers", users }), []);
 
   const reloadSocial = useCallback(async () => {
     const result = await fetchSocial(userId);
@@ -258,8 +270,8 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
       getCircle,
       reloadSocial,
       runSocial,
-      react: (postId, reaction) => dispatch({ type: "react", postId, reaction }),
-      addPost: (post) => dispatch({ type: "addPost", post }),
+      postsChanged,
+      mergeUsers,
       vote: (pollId, optionId) => dispatch({ type: "vote", pollId, optionId }),
       addPoll: (poll) => dispatch({ type: "addPoll", poll }),
       closePoll: (pollId) => dispatch({ type: "closePoll", pollId }),
@@ -267,7 +279,7 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
       updateSettings: (changes) => dispatch({ type: "updateSettings", changes }),
       showToast,
     };
-  }, [state, me, userId, email, getUser, getCircle, reloadSocial, runSocial, showToast]);
+  }, [state, me, userId, email, getUser, getCircle, reloadSocial, runSocial, showToast, postsChanged, mergeUsers]);
 
   return <VybzContext.Provider value={value}>{children}</VybzContext.Provider>;
 }

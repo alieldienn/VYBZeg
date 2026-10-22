@@ -1,9 +1,9 @@
 /*
- * Realistic sample data for the frontend-only milestone.
- * Everything here is fake. When Supabase is connected, this file gets
- * replaced by real database queries that return the same types.
+ * Leftover sample data. Only the Plans screen still uses it (sample polls,
+ * the people who voted, and the circles they belong to) until Stage 7
+ * connects polls to Supabase. Everything else now comes from the database.
  */
-import type { Circle, Poll, Post, Prompt, Settings, User } from "./types";
+import type { Circle, Poll, Settings, User } from "./types";
 
 export const CURRENT_USER_ID = "u-me";
 
@@ -27,173 +27,6 @@ export const SAMPLE_USERS: User[] = [
   { id: "u-seif", name: "Seif Ahmed", username: "seif.ahmed", avatarHue: 185, area: "Maadi" },
   { id: "u-mariam", name: "Mariam Hossam", username: "mariamh", avatarHue: 300, area: "Heliopolis" },
   { id: "u-adam", name: "Adam Sherif", username: "adam.sh", avatarHue: 120, area: "October" },
-];
-
-export const TODAY_PROMPT_ID = "p-view";
-
-export const PROMPTS: Prompt[] = [
-  { id: TODAY_PROMPT_ID, emoji: "📍", text: "Show us the view from where you are right now" },
-  { id: "p-plate", emoji: "🍽️", text: "What's on your plate?" },
-  { id: "p-win", emoji: "🏆", text: "Small win of the day" },
-  { id: "p-song", emoji: "🎧", text: "Song stuck in your head today?" },
-  { id: "p-take", emoji: "🌶️", text: "Drop your hottest take" },
-  { id: "p-tonight", emoji: "🌙", text: "Plans for tonight?" },
-];
-
-/** How many friends have answered today's prompt (sample number). */
-export const TODAY_ANSWERED_COUNT = 18;
-
-export const SAMPLE_POSTS: Post[] = [
-  {
-    id: "post-1",
-    authorId: "u-youssef",
-    circleId: "c-squad",
-    promptId: TODAY_PROMPT_ID,
-    kind: "photo",
-    imageUrl: "/samples/cafe.jpg",
-    text: "Zamalek café run, third flat white of the day. No regrets.",
-    location: "Zamalek",
-    timeLabel: "12m",
-    reactions: { fire: 8, lol: 1, love: 5, care: 2, wow: 0 },
-    myReaction: null,
-  },
-  {
-    id: "post-2",
-    authorId: "u-farida",
-    circleId: null,
-    promptId: "p-take",
-    kind: "text",
-    background: "sunset",
-    text: "Koshary hits different at 2am than at lunch. I don't make the rules.",
-    timeLabel: "34m",
-    reactions: { fire: 14, lol: 9, love: 2, care: 0, wow: 1 },
-    myReaction: "lol",
-  },
-  {
-    id: "post-3",
-    authorId: "u-omar",
-    circleId: null,
-    promptId: TODAY_PROMPT_ID,
-    kind: "photo",
-    imageUrl: "/samples/traffic.jpg",
-    text: "Ring Road at 5pm. Send help (and snacks).",
-    location: "Ring Road",
-    timeLabel: "1h",
-    reactions: { fire: 2, lol: 11, love: 0, care: 6, wow: 1 },
-    myReaction: null,
-  },
-  {
-    id: "post-4",
-    authorId: "u-hana",
-    circleId: "c-study",
-    promptId: "p-win",
-    kind: "photo",
-    imageUrl: "/samples/reading.jpg",
-    text: "Finished chapter 6 before midnight. Celebrating with actual sleep.",
-    timeLabel: "2h",
-    reactions: { fire: 6, lol: 0, love: 3, care: 7, wow: 0 },
-    myReaction: "care",
-  },
-  {
-    id: "post-5",
-    authorId: "u-laila",
-    circleId: null,
-    promptId: "p-song",
-    kind: "text",
-    background: "violet",
-    text: "Old Amr Diab on repeat since Tuesday. Not sorry.",
-    timeLabel: "3h",
-    reactions: { fire: 5, lol: 2, love: 9, care: 1, wow: 0 },
-    myReaction: null,
-  },
-  {
-    id: "post-6",
-    authorId: "u-ziad",
-    circleId: null,
-    promptId: null,
-    kind: "photo",
-    imageUrl: "/samples/concert.jpg",
-    text: "That set last night was unreal. Who's coming next time?",
-    location: "Downtown",
-    timeLabel: "4h",
-    reactions: { fire: 21, lol: 0, love: 6, care: 0, wow: 4 },
-    myReaction: null,
-  },
-  {
-    id: "post-7",
-    authorId: "u-karim",
-    circleId: "c-sahel",
-    promptId: null,
-    kind: "photo",
-    imageUrl: "/samples/dunes.jpg",
-    text: "Fayoum last weekend. Next stop: Sahel?",
-    location: "Fayoum",
-    timeLabel: "5h",
-    reactions: { fire: 12, lol: 0, love: 8, care: 0, wow: 6 },
-    myReaction: "wow",
-  },
-  {
-    id: "post-8",
-    authorId: "u-nour",
-    circleId: "c-squad",
-    promptId: "p-plate",
-    kind: "photo",
-    imageUrl: "/samples/food.jpg",
-    text: "Trying to eat healthy. Day 2. Wish me luck.",
-    timeLabel: "6h",
-    reactions: { fire: 3, lol: 4, love: 5, care: 2, wow: 0 },
-    myReaction: null,
-  },
-  {
-    id: "post-9",
-    authorId: "u-mariam",
-    circleId: null,
-    promptId: TODAY_PROMPT_ID,
-    kind: "photo",
-    imageUrl: "/samples/golden.jpg",
-    text: "Golden hour hits different from the balcony.",
-    location: "Heliopolis",
-    timeLabel: "7h",
-    reactions: { fire: 9, lol: 0, love: 13, care: 1, wow: 2 },
-    myReaction: null,
-  },
-  {
-    id: "post-10",
-    authorId: CURRENT_USER_ID,
-    circleId: "c-squad",
-    promptId: "p-win",
-    kind: "photo",
-    imageUrl: "/samples/jump.jpg",
-    text: "Last exam DONE. Officially free.",
-    timeLabel: "1d",
-    reactions: { fire: 17, lol: 2, love: 10, care: 4, wow: 1 },
-    myReaction: null,
-  },
-  {
-    id: "post-11",
-    authorId: CURRENT_USER_ID,
-    circleId: null,
-    promptId: "p-take",
-    kind: "text",
-    background: "midnight",
-    text: "Iced coffee in December is a personality, not a phase.",
-    timeLabel: "3d",
-    reactions: { fire: 11, lol: 7, love: 3, care: 0, wow: 0 },
-    myReaction: null,
-  },
-  {
-    id: "post-12",
-    authorId: CURRENT_USER_ID,
-    circleId: null,
-    promptId: "p-tonight",
-    kind: "photo",
-    imageUrl: "/samples/alley.jpg",
-    text: "Late walk, good company.",
-    location: "Downtown",
-    timeLabel: "5d",
-    reactions: { fire: 6, lol: 0, love: 9, care: 2, wow: 0 },
-    myReaction: null,
-  },
 ];
 
 export const SAMPLE_CIRCLES: Circle[] = [
@@ -336,7 +169,3 @@ export const DEFAULT_SETTINGS: Settings = {
   showActivity: true,
   reduceMotion: false,
 };
-
-/** Sample streak before today's post. */
-export const SAMPLE_STREAK = 11;
-export const SAMPLE_FRIEND_COUNT = 48;

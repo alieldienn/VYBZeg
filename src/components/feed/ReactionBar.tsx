@@ -1,13 +1,42 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { REACTIONS } from "@/lib/constants";
+import { setReaction } from "@/lib/posts";
 import { useVybz } from "@/lib/store";
-import type { Post } from "@/lib/types";
+import type { Post, ReactionKey } from "@/lib/types";
 import { cn, reactionCount } from "@/lib/utils";
 
+type ReactionBarProps = {
+  post: Post;
+  /** Previews show counts without working buttons. */
+  interactive?: boolean;
+  /** Called with the updated post (instantly, and again to undo if saving fails). */
+  onChange?: (post: Post) => void;
+};
+
 /** Tap an emoji to react. Tap it again to remove your reaction. One reaction per post. */
-export function ReactionBar({ post, interactive = true }: { post: Post; interactive?: boolean }) {
-  const { react } = useVybz();
+export function ReactionBar({ post, interactive = true, onChange }: ReactionBarProps) {
+  const router = useRouter();
+  const { showToast } = useVybz();
+  const [saving, setSaving] = useState(false);
+
+  async function react(key: ReactionKey) {
+    if (!onChange || saving) return;
+    const before = post;
+    const next = post.myReaction === key ? null : key;
+    onChange({ ...post, myReaction: next }); // Show it right away…
+    setSaving(true);
+    const result = await setReaction(post.id, before.myReaction, next);
+    setSaving(false);
+    if (result.error) {
+      onChange(before); // …and undo it if saving failed.
+      showToast(result.error, "error");
+      if (result.expired) router.push("/login");
+    }
+  }
+
   return (
     <div className="flex flex-wrap gap-1.5" role="group" aria-label="Reactions">
       {REACTIONS.map(({ key, emoji, label }) => {
@@ -20,7 +49,7 @@ export function ReactionBar({ post, interactive = true }: { post: Post; interact
             disabled={!interactive}
             aria-pressed={mine}
             aria-label={`${label}: ${count}`}
-            onClick={() => react(post.id, key)}
+            onClick={() => react(key)}
             className={cn(
               "flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm transition-all duration-200",
               mine

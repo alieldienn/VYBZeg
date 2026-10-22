@@ -63,7 +63,7 @@ export function SidebarPanel({ pathname }: { pathname: string | null }) {
       <div className="mt-auto space-y-3">
         <div className="rounded-2xl border border-line bg-surface p-3.5 text-xs leading-relaxed text-muted">
           <Tag>Beta</Tag>
-          <p className="mt-2">Your account, friends and circles are real. The feed and plans still show sample data for now.</p>
+          <p className="mt-2">Everything is real except Plans, which still shows sample data for now.</p>
         </div>
         <Link
           href="/profile"
