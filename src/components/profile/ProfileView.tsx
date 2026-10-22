@@ -1,48 +1,87 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Bell, Camera, Flame, Globe2, Loader2, LogOut, MapPin, Palette, PenLine, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
-import { DemoNotice, Tag } from "@/components/ui/DemoNotice";
+import { Tag } from "@/components/ui/DemoNotice";
 import { Segmented } from "@/components/ui/Segmented";
 import { Switch } from "@/components/ui/Switch";
 import { signOut } from "@/lib/auth/actions";
-import { LIMITS, REMINDER_TIMES, THEME_GRADIENTS } from "@/lib/constants";
-import { CURRENT_USER_ID, SAMPLE_FRIEND_COUNT, SAMPLE_STREAK, TODAY_PROMPT_ID } from "@/lib/sample-data";
+import { REMINDER_TIMES, THEME_GRADIENTS } from "@/lib/constants";
+import { setAvatar } from "@/lib/profile/actions";
+import { CURRENT_USER_ID, SAMPLE_STREAK, TODAY_PROMPT_ID } from "@/lib/sample-data";
 import { useVybz } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
+import { deleteAvatar, uploadAvatar } from "@/lib/supabase/uploads";
 import { cn } from "@/lib/utils";
 import { EditProfileSheet } from "./EditProfileSheet";
 
 export function ProfileView() {
-  const { me, email, posts, circles, settings, updateSettings, updateProfile, showToast } = useVybz();
+  const router = useRouter();
+  const { me, userId, email, posts, circles, settings, updateSettings, updateProfile, showToast } = useVybz();
   const [editing, setEditing] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [friendCount, setFriendCount] = useState<number | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
 
+  // Sample data until posts and circles are connected (Stages 5–6).
   const myPosts = posts.filter((post) => post.authorId === CURRENT_USER_ID);
   const postedToday = myPosts.some((post) => post.promptId === TODAY_PROMPT_ID);
   const myCircles = circles.filter((circle) => circle.memberIds.includes(CURRENT_USER_ID));
 
-  function removePhoto() {
-    if (me.avatarUrl?.startsWith("blob:")) URL.revokeObjectURL(me.avatarUrl);
-    updateProfile({ avatarUrl: undefined });
-  }
+  // Real friend count. Row Level Security only returns your own friendships.
+  useEffect(() => {
+    let cancelled = false;
+    createClient()
+      .from("friendships")
+      .select("requester_id", { count: "exact", head: true })
+      .eq("status", "accepted")
+      .then(({ count, error }) => {
+        if (!cancelled && !error) setFriendCount(count ?? 0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  function onPhotoChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    if (!file.type.startsWith("image/") || file.size > LIMITS.maxImageMB * 1024 * 1024) {
-      showToast(`Pick an image under ${LIMITS.maxImageMB} MB`);
+  async function applyAvatar(newPath: string | null) {
+    const result = await setAvatar(newPath);
+    if (result.error) {
+      if (newPath) await deleteAvatar(newPath); // Don't leave the unused upload behind.
+      showToast(result.error, "error");
+      if (result.expired) router.push("/login");
       return;
     }
-    // Shown from a temporary in-browser URL. Nothing is uploaded.
-    removePhoto();
-    updateProfile({ avatarUrl: URL.createObjectURL(file) });
-    showToast("Profile photo updated (demo)");
+    updateProfile({ avatarUrl: result.avatarUrl ?? undefined });
+    showToast(newPath ? "Profile photo updated" : "Profile photo removed");
+  }
+
+  async function onPhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // Allow picking the same file again.
+    if (!file) return;
+    setPhotoBusy(true);
+    try {
+      await applyAvatar(await uploadAvatar(userId, file));
+    } catch (error) {
+      showToast((error as Error).message, "error");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto() {
+    setPhotoBusy(true);
+    try {
+      await applyAvatar(null);
+    } finally {
+      setPhotoBusy(false);
+    }
   }
 
   return (
@@ -54,16 +93,28 @@ export function ProfileView() {
         <div className="px-5 pb-6 sm:px-7">
           <div className="-mt-12 flex items-end justify-between gap-3">
             <div className="relative">
-              <Avatar user={me} size="xl" className="ring-4 ring-surface" />
+              <Avatar user={me} size="xl" className={cn("ring-4 ring-surface", photoBusy && "opacity-50")} />
+              {photoBusy && (
+                <span className="absolute inset-0 flex items-center justify-center" role="status" aria-label="Updating photo">
+                  <Loader2 className="h-7 w-7 animate-spin text-white" />
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => photoInput.current?.click()}
-                className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-surface bg-fg text-canvas transition hover:scale-105"
+                disabled={photoBusy}
+                className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-surface bg-fg text-canvas transition hover:scale-105 disabled:opacity-60"
                 aria-label="Change profile photo"
               >
                 <Camera className="h-4 w-4" />
               </button>
-              <input ref={photoInput} type="file" accept="image/*" className="hidden" onChange={onPhotoChange} />
+              <input
+                ref={photoInput}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/heic"
+                className="hidden"
+                onChange={onPhotoChange}
+              />
             </div>
             <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
               <PenLine className="h-3.5 w-3.5" />
@@ -84,7 +135,8 @@ export function ProfileView() {
             <button
               type="button"
               onClick={removePhoto}
-              className="mt-2 text-xs text-subtle underline-offset-2 hover:text-muted hover:underline"
+              disabled={photoBusy}
+              className="mt-2 text-xs text-subtle underline-offset-2 hover:text-muted hover:underline disabled:opacity-50"
             >
               Remove photo
             </button>
@@ -94,14 +146,17 @@ export function ProfileView() {
             <Stat value={myPosts.length} label="Vibes" />
             <Stat value={SAMPLE_STREAK + (postedToday ? 1 : 0)} label="Streak" icon={<Flame className="h-4 w-4 text-warning" aria-hidden />} />
             <Stat value={myCircles.length} label="Circles" />
-            <Stat value={SAMPLE_FRIEND_COUNT} label="Friends" />
+            <Stat value={friendCount ?? "–"} label="Friends" />
           </dl>
+          <p className="mt-2 text-center text-[11px] text-subtle">
+            Vibes, streak and circles show sample data until posting and circles are connected.
+          </p>
         </div>
       </section>
 
       <section aria-labelledby="my-vibes" className="mt-8">
-        <h2 id="my-vibes" className="mb-3 font-display text-lg font-semibold">
-          Your vibes
+        <h2 id="my-vibes" className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
+          Your vibes <Tag>Sample</Tag>
         </h2>
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {myPosts.map((post) =>
@@ -133,64 +188,54 @@ export function ProfileView() {
       </section>
 
       <div className="mt-10 space-y-6">
-        <DemoNotice>Settings work in the app but are not saved. They reset when you refresh.</DemoNotice>
-
-        <SettingsGroup icon={<Bell className="h-4 w-4" />} title="Notifications">
-          <Switch
-            label="Daily Vibe reminder"
-            description="A nudge when today's prompt drops"
-            checked={settings.dailyReminder}
-            onChange={(dailyReminder) => updateSettings({ dailyReminder })}
-          />
-          <div className={cn("pb-3.5", !settings.dailyReminder && "pointer-events-none opacity-40")}>
+        <SettingsGroup icon={<Bell className="h-4 w-4" />} title="Notifications" note={<Tag tone="soon">Soon</Tag>}>
+          <p className="pt-2 text-xs leading-relaxed text-muted">
+            Reminders and notifications arrive in a later update. These options are a preview and can&apos;t be
+            changed yet.
+          </p>
+          <Switch label="Daily Vibe reminder" description="A nudge when today's prompt drops" checked={false} onChange={() => {}} disabled />
+          <div className="pointer-events-none pb-3.5 opacity-40">
             <p className="mb-2 text-xs text-muted">Remind me in the…</p>
             <Segmented
               label="Reminder time"
-              value={settings.reminderTime}
-              onChange={(reminderTime) => updateSettings({ reminderTime })}
-              options={REMINDER_TIMES.map((time) => ({ ...time, disabled: !settings.dailyReminder }))}
+              value="surprise"
+              onChange={() => {}}
+              options={REMINDER_TIMES.map((time) => ({ ...time, disabled: true }))}
               className="flex-wrap"
             />
           </div>
-          <Switch
-            label="Reactions"
-            description="When friends react to your vibes"
-            checked={settings.notifyReactions}
-            onChange={(notifyReactions) => updateSettings({ notifyReactions })}
-          />
-          <Switch
-            label="Plans & polls"
-            description="New plans and when a plan gets locked in"
-            checked={settings.notifyPlans}
-            onChange={(notifyPlans) => updateSettings({ notifyPlans })}
-          />
-          <Switch
-            label="Circle activity"
-            description="Every new post in your circles"
-            checked={settings.notifyCircles}
-            onChange={(notifyCircles) => updateSettings({ notifyCircles })}
-          />
+          <Switch label="Reactions" description="When friends react to your vibes" checked={false} onChange={() => {}} disabled />
+          <Switch label="Plans & polls" description="New plans and when a plan gets locked in" checked={false} onChange={() => {}} disabled />
+          <Switch label="Circle activity" description="Every new post in your circles" checked={false} onChange={() => {}} disabled />
         </SettingsGroup>
 
         <SettingsGroup icon={<ShieldCheck className="h-4 w-4" />} title="Privacy">
-          <Switch
-            label="Private profile"
-            description="Only approved friends can see your vibes"
-            checked={settings.privateProfile}
-            onChange={(privateProfile) => updateSettings({ privateProfile })}
-          />
-          <Switch
-            label="Show when I'm active"
-            description="Friends see a dot when you're online"
-            checked={settings.showActivity}
-            onChange={(showActivity) => updateSettings({ showActivity })}
-          />
+          <ul className="space-y-3 py-3.5 text-sm leading-relaxed">
+            <li>
+              <span className="font-medium">Your profile</span>
+              <span className="block text-xs text-muted">
+                Only visible to your friends, people in your circles, and people you invite or who invite you.
+              </span>
+            </li>
+            <li>
+              <span className="font-medium">Your vibes</span>
+              <span className="block text-xs text-muted">
+                Only members of the circle you post to can see them. Nothing on VYBZ is public.
+              </span>
+            </li>
+            <li>
+              <span className="font-medium">Finding you</span>
+              <span className="block text-xs text-muted">
+                People can only add you if they type your exact username.
+              </span>
+            </li>
+          </ul>
         </SettingsGroup>
 
         <SettingsGroup icon={<Palette className="h-4 w-4" />} title="App">
           <Switch
             label="Reduce motion"
-            description="Turn off animations across the app"
+            description="Turn off animations. Saved on this device."
             checked={settings.reduceMotion}
             onChange={(reduceMotion) => updateSettings({ reduceMotion })}
           />
@@ -238,7 +283,7 @@ export function ProfileView() {
   );
 }
 
-function Stat({ value, label, icon }: { value: number; label: string; icon?: ReactNode }) {
+function Stat({ value, label, icon }: { value: number | string; label: string; icon?: ReactNode }) {
   return (
     <div className="rounded-2xl bg-elevated px-1 py-3">
       <dd className="flex items-center justify-center gap-1 font-display text-xl font-bold tabular-nums">
@@ -260,12 +305,23 @@ function LogOutButton() {
   );
 }
 
-function SettingsGroup({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+function SettingsGroup({
+  icon,
+  title,
+  note,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  note?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section className="rounded-[28px] border border-line bg-surface px-5 pt-4 pb-1">
       <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-subtle">
         <span className="text-brand-soft">{icon}</span>
         {title}
+        {note}
       </h2>
       <div className="mt-1 divide-y divide-line">{children}</div>
     </section>

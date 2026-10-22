@@ -7,9 +7,11 @@
  * Auth and are never stored or logged by VYBZ.
  */
 import type { AuthError } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { cleanDisplayName, displayNameError, usernameError } from "@/lib/validation";
 import { safeNextPath } from "./paths";
 import { getSessionUser } from "./session";
 
@@ -24,7 +26,6 @@ export type FormState = {
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const USERNAME_PATTERN = /^[a-z0-9._]{3,20}$/;
 const MIN_PASSWORD = 8;
 
 function text(formData: FormData, name: string) {
@@ -78,6 +79,8 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: friendlyAuthError(error), values };
 
+  // Who is logged in changed: drop pages the browser remembered from before.
+  revalidatePath("/", "layout");
   redirect(safeNextPath(text(formData, "next")));
 }
 
@@ -100,7 +103,10 @@ export async function signup(_prev: FormState, formData: FormData): Promise<Form
   if (error) return { error: friendlyAuthError(error), values };
 
   // Email confirmation turned off in Supabase: the user is logged in already.
-  if (data.session) redirect("/onboarding");
+  if (data.session) {
+    revalidatePath("/", "layout");
+    redirect("/onboarding");
+  }
 
   return {
     done: `We sent a confirmation link to ${email}. Open it on this device to finish creating your account.`,
@@ -139,6 +145,7 @@ export async function updatePassword(_prev: FormState, formData: FormData): Prom
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: friendlyAuthError(error) };
 
+  revalidatePath("/", "layout");
   redirect("/?password=updated");
 }
 
@@ -147,16 +154,14 @@ export async function completeOnboarding(_prev: FormState, formData: FormData): 
   if (!user) redirect("/login");
 
   const username = text(formData, "username").toLowerCase();
-  const displayName = text(formData, "displayName").replace(/\s+/g, " ");
+  const displayName = cleanDisplayName(text(formData, "displayName"));
   const avatarPath = text(formData, "avatarPath") || null;
   const values = { username, displayName };
 
-  if (displayName.length < 2 || displayName.length > 40) {
-    return { error: "Your name needs 2–40 characters.", field: "displayName", values };
-  }
-  if (!USERNAME_PATTERN.test(username)) {
-    return { error: "Usernames are 3–20 lowercase letters, numbers, dots or underscores.", field: "username", values };
-  }
+  const nameProblem = displayNameError(displayName);
+  if (nameProblem) return { error: nameProblem, field: "displayName", values };
+  const usernameProblem = usernameError(username);
+  if (usernameProblem) return { error: usernameProblem, field: "username", values };
   if (avatarPath && !avatarPath.startsWith(`${user.id}/`)) {
     return { error: "That photo upload didn't work. Please pick it again.", values };
   }
@@ -170,18 +175,22 @@ export async function completeOnboarding(_prev: FormState, formData: FormData): 
     if (error.code === "23505") {
       // Unique violation: either the username is taken or the profile already exists.
       const { data: existing } = await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
-      if (existing) redirect("/");
+      if (existing) return { done: "/" };
       return { error: `@${username} is taken. Try another one.`, field: "username", values };
     }
     return { error: "We couldn't save your profile. Please try again.", values };
   }
 
-  redirect("/?welcome=1");
+  // The form does a full page load to this address. The browser had remembered
+  // the app pages as "go to onboarding", and a full load is the reliable way
+  // to forget that (tested: a router redirect reused the stale answer).
+  return { done: "/?welcome=1" };
 }
 
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  revalidatePath("/", "layout");
   redirect("/login");
 }
 

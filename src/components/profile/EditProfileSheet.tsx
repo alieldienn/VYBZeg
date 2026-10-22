@@ -1,63 +1,76 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
+import { FormError, TextField } from "@/components/ui/TextField";
 import { LIMITS } from "@/lib/constants";
-import { CURRENT_USER_ID } from "@/lib/sample-data";
+import { useUsernameCheck } from "@/lib/hooks/useUsernameCheck";
+import { saveProfile, type SavedProfile } from "@/lib/profile/actions";
 import { useVybz } from "@/lib/store";
 import type { User } from "@/lib/types";
-
-const USERNAME_PATTERN = /^[a-z0-9._]{3,20}$/;
-
-function usernameError(username: string, users: User[]) {
-  if (!USERNAME_PATTERN.test(username)) {
-    return "3–20 characters: lowercase letters, numbers, dots and underscores.";
-  }
-  if (users.some((user) => user.id !== CURRENT_USER_ID && user.username === username)) {
-    return "That username is taken.";
-  }
-  return null;
-}
+import { AREA_MAX, DISPLAY_NAME_MAX, displayNameError } from "@/lib/validation";
+import { UsernameField } from "./UsernameField";
 
 /** Wrapper that resets the form every time the sheet opens. */
 export function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { me } = useVybz();
   return (
-    <Sheet open={open} onClose={onClose} title="Edit profile" description="Changes are saved on this device only (demo).">
-      {open && <EditProfileForm key={me.username} me={me} onDone={onClose} />}
+    <Sheet open={open} onClose={onClose} title="Edit profile" description="Friends and people in your circles see this.">
+      {open && <EditProfileForm me={me} onDone={onClose} />}
     </Sheet>
   );
 }
 
+type SaveState = Awaited<ReturnType<typeof saveProfile>>;
+
 function EditProfileForm({ me, onDone }: { me: User; onDone: () => void }) {
-  const { users, updateProfile, showToast } = useVybz();
+  const router = useRouter();
+  const { updateProfile, showToast } = useVybz();
   const [name, setName] = useState(me.name);
   const [username, setUsername] = useState(me.username);
   const [bio, setBio] = useState(me.bio ?? "");
   const [area, setArea] = useState(me.area ?? "");
+  const usernameStatus = useUsernameCheck(username, me.username);
 
-  const nameError = name.trim().length < 2 ? "Your name needs at least 2 characters." : null;
-  const handleError = usernameError(username, users);
-  const valid = !nameError && !handleError;
+  const [state, action, pending] = useActionState<SaveState, FormData>(async (prev, formData) => {
+    const result = await saveProfile(prev, formData);
+    if (result.saved) {
+      const saved: SavedProfile = result.saved;
+      updateProfile(saved);
+      showToast("Profile updated");
+      onDone();
+    } else if (result.field === "session") {
+      showToast(result.error ?? "Please log in again.", "error");
+      router.push("/login");
+    }
+    return result;
+  }, {});
 
-  function save(event: FormEvent) {
-    event.preventDefault();
-    if (!valid) return;
-    updateProfile({ name: name.trim(), username, bio: bio.trim(), area: area.trim() });
-    showToast("Profile updated");
-    onDone();
-  }
+  const nameError = state.field === "displayName" ? state.error : name ? displayNameError(name) : null;
+  const canSave =
+    !pending && !displayNameError(name) && (usernameStatus === "available" || usernameStatus === "yours");
 
   return (
-    <form onSubmit={save} className="space-y-5">
-      <Input label="Name" value={name} onChange={(v) => setName(v.slice(0, 40))} error={nameError} />
-      <Input
-        label="Username"
-        prefix="@"
+    <form action={action} className="space-y-5" noValidate>
+      {state.error && !["displayName", "username", "bio", "area", "session"].includes(state.field ?? "") && (
+        <FormError>{state.error}</FormError>
+      )}
+      <TextField
+        label="Name"
+        name="displayName"
+        autoComplete="name"
+        value={name}
+        onChange={(event) => setName(event.target.value.slice(0, DISPLAY_NAME_MAX))}
+        error={nameError}
+      />
+      <UsernameField
         value={username}
-        onChange={(v) => setUsername(v.toLowerCase().replace(/\s/g, "").slice(0, 20))}
-        error={handleError}
+        onChange={setUsername}
+        status={usernameStatus}
+        serverError={state.field === "username" ? state.error : null}
       />
       <label className="block">
         <span className="mb-2 flex items-center justify-between text-sm font-medium">
@@ -67,55 +80,27 @@ function EditProfileForm({ me, onDone }: { me: User; onDone: () => void }) {
           </span>
         </span>
         <textarea
+          name="bio"
           value={bio}
           onChange={(event) => setBio(event.target.value.slice(0, LIMITS.bio))}
           rows={3}
           placeholder="A little about you"
           className="w-full resize-none rounded-2xl border border-line bg-elevated px-4 py-3 text-[15px] placeholder:text-subtle focus:border-brand/60 focus:outline-none"
         />
+        {state.field === "bio" && <span className="mt-1.5 block text-xs text-danger">{state.error}</span>}
       </label>
-      <Input label="Area" value={area} onChange={(v) => setArea(v.slice(0, 40))} placeholder="e.g. Maadi, Cairo" />
-      <Button type="submit" size="lg" className="w-full" disabled={!valid}>
-        Save changes
+      <TextField
+        label="Area"
+        name="area"
+        value={area}
+        onChange={(event) => setArea(event.target.value.slice(0, AREA_MAX))}
+        placeholder="e.g. Maadi, Cairo"
+        error={state.field === "area" ? state.error : null}
+      />
+      <Button type="submit" size="lg" className="w-full" disabled={!canSave} aria-busy={pending}>
+        {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+        {pending ? "Saving…" : "Save changes"}
       </Button>
     </form>
-  );
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  error,
-  prefix,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  error?: string | null;
-  prefix?: string;
-  placeholder?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium">{label}</span>
-      <span
-        className={
-          "flex items-center rounded-2xl border bg-elevated px-4 focus-within:border-brand/60 " +
-          (error ? "border-danger/60" : "border-line")
-        }
-      >
-        {prefix && <span className="mr-0.5 text-subtle">{prefix}</span>}
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          aria-invalid={Boolean(error)}
-          className="h-12 w-full bg-transparent text-[15px] placeholder:text-subtle focus:outline-none"
-        />
-      </span>
-      {error && <span className="mt-1.5 block text-xs text-danger">{error}</span>}
-    </label>
   );
 }

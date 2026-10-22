@@ -22,7 +22,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 async function SignedInApp({ children }: { children: ReactNode }) {
   const { user, profile } = await requireProfile();
   return (
-    <VybzProvider me={profileToUser(profile)} email={user.email ?? ""}>
+    <VybzProvider me={profileToUser(profile)} userId={user.id} email={user.email ?? ""}>
       <AppShell>{children}</AppShell>
     </VybzProvider>
   );

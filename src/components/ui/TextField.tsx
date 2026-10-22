@@ -26,10 +26,14 @@ export function TextField({ label, error, hint, prefix, aside, className, id, ty
 
   return (
     <div className={className}>
-      <label htmlFor={inputId} className="mb-2 flex items-center justify-between text-sm font-medium">
-        {label}
+      {/* The aside (e.g. a "Forgot password?" link) sits beside the label, not inside it,
+          so screen readers announce the field by its label alone. */}
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <label htmlFor={inputId} className="text-sm font-medium">
+          {label}
+        </label>
         {aside}
-      </label>
+      </div>
       <span
         className={cn(
           "flex items-center rounded-2xl border bg-elevated px-4 transition-colors focus-within:border-brand/60",

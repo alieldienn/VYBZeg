@@ -3,9 +3,11 @@
 /*
  * App-wide state shared by every screen.
  * Milestone 2 is moving this to Supabase one feature at a time:
- *  - Your own profile (name, username, photo) is REAL, loaded on the server.
- *  - Posts, circles, polls, other users and settings are still sample data held
- *    in memory (refreshing resets them) until their stage is connected.
+ *  - Your own profile (name, username, bio, area, photo) is REAL: loaded on the
+ *    server, and edits are saved to Supabase before updating this state.
+ *  - "Reduce motion" is remembered on this device (localStorage).
+ *  - Posts, circles, polls and other users are still sample data held in
+ *    memory (refreshing resets them) until their stage is connected.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import {
@@ -18,7 +20,9 @@ import {
 } from "./sample-data";
 import type { Circle, Poll, Post, ReactionKey, Settings, User } from "./types";
 
-type Toast = { id: number; message: string };
+export type ToastTone = "success" | "error";
+
+type Toast = { id: number; message: string; tone: ToastTone };
 
 type State = {
   users: User[];
@@ -39,7 +43,7 @@ type Action =
   | { type: "invite"; circleId: string; userIds: string[] }
   | { type: "updateProfile"; changes: Partial<Pick<User, "name" | "username" | "bio" | "area" | "avatarUrl">> }
   | { type: "updateSettings"; changes: Partial<Settings> }
-  | { type: "toast"; message: string }
+  | { type: "toast"; message: string; tone: ToastTone }
   | { type: "dismissToast"; id: number };
 
 const initialState: State = {
@@ -101,7 +105,7 @@ function reducer(state: State, action: Action): State {
     case "updateSettings":
       return { ...state, settings: { ...state.settings, ...action.changes } };
     case "toast":
-      return { ...state, toast: { id: (state.toast?.id ?? 0) + 1, message: action.message } };
+      return { ...state, toast: { id: (state.toast?.id ?? 0) + 1, message: action.message, tone: action.tone } };
     case "dismissToast":
       return state.toast?.id === action.id ? { ...state, toast: null } : state;
   }
@@ -109,6 +113,8 @@ function reducer(state: State, action: Action): State {
 
 type VybzContextValue = State & {
   me: User;
+  /** Real Supabase id of the logged-in account (me.id is still the sample id for now). */
+  userId: string;
   /** Email address of the logged-in account. */
   email: string;
   getUser: (id: string) => User | undefined;
@@ -122,10 +128,12 @@ type VybzContextValue = State & {
   invite: (circleId: string, userIds: string[]) => void;
   updateProfile: (changes: Extract<Action, { type: "updateProfile" }>["changes"]) => void;
   updateSettings: (changes: Partial<Settings>) => void;
-  showToast: (message: string) => void;
+  showToast: (message: string, tone?: ToastTone) => void;
 };
 
 const VybzContext = createContext<VybzContextValue | null>(null);
+
+const REDUCE_MOTION_KEY = "vybz:reduce-motion";
 
 /**
  * Temporary bridge until posts/circles/polls come from the database: the real
@@ -139,24 +147,18 @@ function withRealMe(me: User): State {
   };
 }
 
-export function VybzProvider({ me, email, children }: { me: User; email: string; children: ReactNode }) {
+export function VybzProvider({
+  me,
+  userId,
+  email,
+  children,
+}: {
+  me: User;
+  userId: string;
+  email: string;
+  children: ReactNode;
+}) {
   const [state, dispatch] = useReducer(reducer, me, withRealMe);
-
-  // One-off messages passed in the address after onboarding or a password reset.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const message = params.has("welcome")
-      ? `Welcome to VYBZ, ${me.name.split(" ")[0]}!`
-      : params.get("password") === "updated"
-        ? "Password updated"
-        : null;
-    if (!message) return;
-    dispatch({ type: "toast", message });
-    params.delete("welcome");
-    params.delete("password");
-    const query = params.toString();
-    window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
-  }, [me.name]);
 
   // Auto-hide the toast after a few seconds.
   useEffect(() => {
@@ -166,9 +168,22 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
     return () => clearTimeout(timer);
   }, [state.toast]);
 
-  // Apply the in-app "Reduce motion" preference to the whole page.
+  // Restore "Reduce motion" saved on this device. Storage can be blocked
+  // (e.g. private browsing), so failures are ignored.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(REDUCE_MOTION_KEY) === "1") {
+        dispatch({ type: "updateSettings", changes: { reduceMotion: true } });
+      }
+    } catch {}
+  }, []);
+
+  // Apply the "Reduce motion" preference to the whole page and remember it.
   useEffect(() => {
     document.documentElement.dataset.motion = state.settings.reduceMotion ? "reduce" : "full";
+    try {
+      localStorage.setItem(REDUCE_MOTION_KEY, state.settings.reduceMotion ? "1" : "0");
+    } catch {}
   }, [state.settings.reduceMotion]);
 
   const getUser = useCallback((id: string) => state.users.find((user) => user.id === id), [state.users]);
@@ -178,6 +193,7 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
     () => ({
       ...state,
       me: state.users.find((user) => user.id === CURRENT_USER_ID)!,
+      userId,
       email,
       getUser,
       getCircle,
@@ -190,9 +206,9 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
       invite: (circleId, userIds) => dispatch({ type: "invite", circleId, userIds }),
       updateProfile: (changes) => dispatch({ type: "updateProfile", changes }),
       updateSettings: (changes) => dispatch({ type: "updateSettings", changes }),
-      showToast: (message) => dispatch({ type: "toast", message }),
+      showToast: (message, tone = "success") => dispatch({ type: "toast", message, tone }),
     }),
-    [state, email, getUser, getCircle],
+    [state, userId, email, getUser, getCircle],
   );
 
   return <VybzContext.Provider value={value}>{children}</VybzContext.Provider>;

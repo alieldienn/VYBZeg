@@ -1,16 +1,16 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Camera, Check, Loader2, X } from "lucide-react";
+import { Camera, X } from "lucide-react";
+import { UsernameField } from "@/components/profile/UsernameField";
 import { Avatar } from "@/components/ui/Avatar";
 import { FormError, TextField } from "@/components/ui/TextField";
 import { completeOnboarding, signOut, type FormState } from "@/lib/auth/actions";
 import { LIMITS } from "@/lib/constants";
-import { createClient } from "@/lib/supabase/client";
+import { useUsernameCheck } from "@/lib/hooks/useUsernameCheck";
 import { deleteAvatar, uploadAvatar } from "@/lib/supabase/uploads";
+import { DISPLAY_NAME_MAX } from "@/lib/validation";
 import { AuthHeading, SubmitButton } from "./AuthForms";
-
-const USERNAME_PATTERN = /^[a-z0-9._]{3,20}$/;
 
 /** Turns "Malak.Adel+test@gmail.com" into a starting suggestion like "malak.adeltest". */
 function suggestUsername(email: string) {
@@ -23,8 +23,7 @@ export function OnboardingForm({ userId, email }: { userId: string; email: strin
   const [username, setUsername] = useState(() => suggestUsername(email));
   const [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
-  // Result of the last "is this username free?" lookup.
-  const [lookup, setLookup] = useState<{ username: string; taken: boolean } | null>(null);
+  const usernameStatus = useUsernameCheck(username);
   const photoInput = useRef<HTMLInputElement>(null);
 
   const [state, action, pending] = useActionState<FormState, FormData>(async (prev, formData) => {
@@ -38,28 +37,15 @@ export function OnboardingForm({ userId, email }: { userId: string; email: strin
       }
     }
     const result = await completeOnboarding(prev, formData);
+    if (result.done) {
+      // Profile saved: full page load into the app (see completeOnboarding).
+      window.location.assign(result.done);
+      return result;
+    }
     // Saving failed: tidy up the photo nobody will use.
-    if (uploadedPath && result?.error) await deleteAvatar(uploadedPath);
-    return result ?? {};
+    if (uploadedPath && result.error) await deleteAvatar(uploadedPath);
+    return result;
   }, {});
-
-  const usernameValid = USERNAME_PATTERN.test(username);
-  const checking = usernameValid && lookup?.username !== username;
-  const taken = usernameValid && lookup?.username === username && lookup.taken;
-
-  // Ask the database whether the username is free, shortly after typing stops.
-  useEffect(() => {
-    if (!USERNAME_PATTERN.test(username)) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      const { data, error } = await createClient().rpc("find_profile_by_username", { p_username: username });
-      if (!cancelled && !error) setLookup({ username, taken: (data ?? []).length > 0 });
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [username]);
 
   // Free the temporary preview link when the photo changes or the page closes.
   useEffect(() => () => (photo ? URL.revokeObjectURL(photo.preview) : undefined), [photo]);
@@ -75,27 +61,6 @@ export function OnboardingForm({ userId, email }: { userId: string; email: strin
     }
     setPhoto({ file, preview: URL.createObjectURL(file) });
   }
-
-  const usernameError =
-    state.field === "username"
-      ? state.error
-      : username && !usernameValid
-        ? "3–20 characters: lowercase letters, numbers, dots and underscores."
-        : taken
-          ? `@${username} is taken. Try another one.`
-          : null;
-
-  const usernameHint = checking ? (
-    <span className="inline-flex items-center gap-1">
-      <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> Checking…
-    </span>
-  ) : usernameValid && lookup ? (
-    <span className="inline-flex items-center gap-1 text-success">
-      <Check className="h-3 w-3" aria-hidden /> @{username} is available
-    </span>
-  ) : (
-    "This is how friends find you."
-  );
 
   return (
     <>
@@ -143,24 +108,19 @@ export function OnboardingForm({ userId, email }: { userId: string; email: strin
           placeholder="e.g. Malak Adel"
           required
           value={displayName}
-          onChange={(event) => setDisplayName(event.target.value.slice(0, 40))}
+          onChange={(event) => setDisplayName(event.target.value.slice(0, DISPLAY_NAME_MAX))}
           error={state.field === "displayName" ? state.error : null}
         />
-        <TextField
-          label="Username"
-          name="username"
-          prefix="@"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          required
+        <UsernameField
           value={username}
-          onChange={(event) => setUsername(event.target.value.toLowerCase().replace(/\s/g, "").slice(0, 20))}
-          error={usernameError}
-          hint={usernameHint}
+          onChange={setUsername}
+          status={usernameStatus}
+          serverError={state.field === "username" ? state.error : null}
         />
 
-        <SubmitButton pending={pending}>{pending ? "Saving…" : "Let's go"}</SubmitButton>
+        <SubmitButton pending={pending || Boolean(state.done)}>
+          {pending || state.done ? "Saving…" : "Let's go"}
+        </SubmitButton>
       </form>
       <form action={signOut} className="mt-5 text-center text-xs text-subtle">
         Signed in as {email}.{" "}

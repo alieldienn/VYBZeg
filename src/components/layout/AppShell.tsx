@@ -1,6 +1,7 @@
 import { Suspense, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/Toaster";
 import { BottomNav, BottomNavBar } from "./BottomNav";
+import { FlashMessages } from "./FlashMessages";
 import { Sidebar, SidebarPanel } from "./Sidebar";
 
 /**
@@ -21,6 +22,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <BottomNav />
       </Suspense>
       <Toaster />
+      <Suspense>
+        <FlashMessages />
+      </Suspense>
     </>
   );
 }
