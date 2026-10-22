@@ -3,22 +3,22 @@
 /*
  * App-wide state shared by every screen.
  * Milestone 2 is moving this to Supabase one feature at a time:
- *  - Your own profile (name, username, bio, area, photo) is REAL: loaded on the
- *    server, and edits are saved to Supabase before updating this state.
+ *  - Your profile is REAL: loaded on the server; edits are saved to Supabase first.
+ *  - Friends, friend requests, circles and circle invites are REAL: loaded from
+ *    Supabase in the browser (Row Level Security decides what you can see) and
+ *    reloaded after every change.
  *  - "Reduce motion" is remembered on this device (localStorage).
- *  - Posts, circles, polls and other users are still sample data held in
- *    memory (refreshing resets them) until their stage is connected.
+ *  - Posts and polls are still SAMPLE data held in memory (refreshing resets
+ *    them) until their stage is connected. The sample "me" has been swapped for
+ *    your real account, and the sample circles they mention are kept only so
+ *    those posts and polls can still show a circle name.
  */
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
-import {
-  CURRENT_USER_ID,
-  DEFAULT_SETTINGS,
-  SAMPLE_CIRCLES,
-  SAMPLE_POLLS,
-  SAMPLE_POSTS,
-  SAMPLE_USERS,
-} from "./sample-data";
-import type { Circle, Poll, Post, ReactionKey, Settings, User } from "./types";
+import { CURRENT_USER_ID, DEFAULT_SETTINGS, SAMPLE_CIRCLES, SAMPLE_POLLS, SAMPLE_POSTS, SAMPLE_USERS } from "./sample-data";
+import { fetchSocial, type SocialData } from "./social";
+import type { Result } from "./supabase/errors";
+import type { Circle, CircleInvite, FriendRequest, Poll, Post, ReactionKey, Settings, User } from "./types";
 
 export type ToastTone = "success" | "error";
 
@@ -27,8 +27,16 @@ type Toast = { id: number; message: string; tone: ToastTone };
 type State = {
   users: User[];
   posts: Post[];
+  /** Your real circles. */
   circles: Circle[];
+  /** Sample circles, only for labelling sample posts and polls. */
+  sampleCircles: Circle[];
   polls: Poll[];
+  friendIds: string[];
+  requests: FriendRequest[];
+  invites: CircleInvite[];
+  /** Loading status of friends/circles from Supabase. */
+  social: { status: "loading" | "ready" | "error"; error?: string };
   settings: Settings;
   toast: Toast | null;
 };
@@ -39,21 +47,12 @@ type Action =
   | { type: "vote"; pollId: string; optionId: string }
   | { type: "addPoll"; poll: Poll }
   | { type: "closePoll"; pollId: string }
-  | { type: "addCircle"; circle: Circle }
-  | { type: "invite"; circleId: string; userIds: string[] }
-  | { type: "updateProfile"; changes: Partial<Pick<User, "name" | "username" | "bio" | "area" | "avatarUrl">> }
+  | { type: "socialLoaded"; data: SocialData }
+  | { type: "socialFailed"; error: string }
+  | { type: "updateProfile"; userId: string; changes: Partial<Pick<User, "name" | "username" | "bio" | "area" | "avatarUrl">> }
   | { type: "updateSettings"; changes: Partial<Settings> }
   | { type: "toast"; message: string; tone: ToastTone }
   | { type: "dismissToast"; id: number };
-
-const initialState: State = {
-  users: SAMPLE_USERS,
-  posts: SAMPLE_POSTS,
-  circles: SAMPLE_CIRCLES,
-  polls: SAMPLE_POLLS,
-  settings: DEFAULT_SETTINGS,
-  toast: null,
-};
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -86,21 +85,25 @@ function reducer(state: State, action: Action): State {
           poll.id === action.pollId ? { ...poll, status: "decided", deadlineLabel: "Closed" } : poll,
         ),
       };
-    case "addCircle":
-      return { ...state, circles: [action.circle, ...state.circles] };
-    case "invite":
+    case "socialLoaded": {
+      const fresh = new Set(action.data.users.map((user) => user.id));
       return {
         ...state,
-        circles: state.circles.map((circle) =>
-          circle.id === action.circleId
-            ? { ...circle, invitedIds: Array.from(new Set([...circle.invitedIds, ...action.userIds])) }
-            : circle,
-        ),
+        users: [...state.users.filter((user) => !fresh.has(user.id)), ...action.data.users],
+        circles: action.data.circles,
+        friendIds: action.data.friendIds,
+        requests: action.data.requests,
+        invites: action.data.invites,
+        social: { status: "ready" },
       };
+    }
+    case "socialFailed":
+      // Keep showing what was loaded before, if anything.
+      return { ...state, social: { status: state.social.status === "ready" ? "ready" : "error", error: action.error } };
     case "updateProfile":
       return {
         ...state,
-        users: state.users.map((user) => (user.id === CURRENT_USER_ID ? { ...user, ...action.changes } : user)),
+        users: state.users.map((user) => (user.id === action.userId ? { ...user, ...action.changes } : user)),
       };
     case "updateSettings":
       return { ...state, settings: { ...state.settings, ...action.changes } };
@@ -111,21 +114,56 @@ function reducer(state: State, action: Action): State {
   }
 }
 
+/** Starting state: sample posts/polls with the sample "me" replaced by your real account. */
+function initialState({ me }: { me: User }): State {
+  const swap = (id: string) => (id === CURRENT_USER_ID ? me.id : id);
+  return {
+    users: SAMPLE_USERS.map((user) => (user.id === CURRENT_USER_ID ? me : user)),
+    posts: SAMPLE_POSTS.map((post) => ({ ...post, authorId: swap(post.authorId) })),
+    polls: SAMPLE_POLLS.map((poll) => ({
+      ...poll,
+      creatorId: swap(poll.creatorId),
+      options: poll.options.map((option) => ({ ...option, voterIds: option.voterIds.map(swap) })),
+    })),
+    circles: [],
+    sampleCircles: SAMPLE_CIRCLES.map((circle) => ({
+      ...circle,
+      sample: true,
+      memberIds: circle.memberIds.map(swap),
+      activity: circle.activity.map((item) => ({ ...item, userId: swap(item.userId) })),
+    })),
+    friendIds: [],
+    requests: [],
+    invites: [],
+    social: { status: "loading" },
+    settings: DEFAULT_SETTINGS,
+    toast: null,
+  };
+}
+
 type VybzContextValue = State & {
   me: User;
-  /** Real Supabase id of the logged-in account (me.id is still the sample id for now). */
+  /** Supabase id of the logged-in account (same as me.id). */
   userId: string;
   /** Email address of the logged-in account. */
   email: string;
+  /** Your accepted friends. */
+  friends: User[];
   getUser: (id: string) => User | undefined;
+  /** Finds one of your circles (or a sample circle mentioned by sample posts/polls). */
   getCircle: (id: string) => Circle | undefined;
+  /** Reloads friends, requests, circles and invites from Supabase. */
+  reloadSocial: () => Promise<void>;
+  /**
+   * Runs a Supabase change, then: on error shows it (and sends you to log in if
+   * your session expired); on success shows `success` and reloads. Returns true on success.
+   */
+  runSocial: (change: Promise<Result>, success?: string) => Promise<boolean>;
   react: (postId: string, reaction: ReactionKey) => void;
   addPost: (post: Post) => void;
   vote: (pollId: string, optionId: string) => void;
   addPoll: (poll: Poll) => void;
   closePoll: (pollId: string) => void;
-  addCircle: (circle: Circle) => void;
-  invite: (circleId: string, userIds: string[]) => void;
   updateProfile: (changes: Extract<Action, { type: "updateProfile" }>["changes"]) => void;
   updateSettings: (changes: Partial<Settings>) => void;
   showToast: (message: string, tone?: ToastTone) => void;
@@ -135,30 +173,46 @@ const VybzContext = createContext<VybzContextValue | null>(null);
 
 const REDUCE_MOTION_KEY = "vybz:reduce-motion";
 
-/**
- * Temporary bridge until posts/circles/polls come from the database: the real
- * profile takes the place of the sample "me" user (keeping the sample id) so
- * the sample feed, circles and polls still line up with it.
- */
-function withRealMe(me: User): State {
-  return {
-    ...initialState,
-    users: SAMPLE_USERS.map((user) => (user.id === CURRENT_USER_ID ? { ...me, id: CURRENT_USER_ID } : user)),
-  };
-}
+export function VybzProvider({ me, email, children }: { me: User; email: string; children: ReactNode }) {
+  const router = useRouter();
+  const [state, dispatch] = useReducer(reducer, { me }, initialState);
+  const userId = me.id;
 
-export function VybzProvider({
-  me,
-  userId,
-  email,
-  children,
-}: {
-  me: User;
-  userId: string;
-  email: string;
-  children: ReactNode;
-}) {
-  const [state, dispatch] = useReducer(reducer, me, withRealMe);
+  const showToast = useCallback(
+    (message: string, tone: ToastTone = "success") => dispatch({ type: "toast", message, tone }),
+    [],
+  );
+
+  const reloadSocial = useCallback(async () => {
+    const result = await fetchSocial(userId);
+    if (result.data) {
+      dispatch({ type: "socialLoaded", data: result.data });
+    } else {
+      dispatch({ type: "socialFailed", error: result.error ?? "Couldn't load your circles." });
+      if (result.expired) router.push("/login");
+    }
+  }, [userId, router]);
+
+  const runSocial = useCallback(
+    async (change: Promise<Result>, success?: string) => {
+      const result = await change;
+      if (result.error) {
+        showToast(result.error, "error");
+        if (result.expired) router.push("/login");
+        return false;
+      }
+      if (success) showToast(success);
+      await reloadSocial();
+      return true;
+    },
+    [reloadSocial, router, showToast],
+  );
+
+  // Load friends and circles once when the app opens. Screens that need fresh
+  // data (Circles, Friends) also call reloadSocial when they open.
+  useEffect(() => {
+    void reloadSocial();
+  }, [reloadSocial]);
 
   // Auto-hide the toast after a few seconds.
   useEffect(() => {
@@ -187,29 +241,33 @@ export function VybzProvider({
   }, [state.settings.reduceMotion]);
 
   const getUser = useCallback((id: string) => state.users.find((user) => user.id === id), [state.users]);
-  const getCircle = useCallback((id: string) => state.circles.find((circle) => circle.id === id), [state.circles]);
+  const getCircle = useCallback(
+    (id: string) =>
+      state.circles.find((circle) => circle.id === id) ?? state.sampleCircles.find((circle) => circle.id === id),
+    [state.circles, state.sampleCircles],
+  );
 
-  const value = useMemo<VybzContextValue>(
-    () => ({
+  const value = useMemo<VybzContextValue>(() => {
+    return {
       ...state,
-      me: state.users.find((user) => user.id === CURRENT_USER_ID)!,
+      me: state.users.find((user) => user.id === userId) ?? me,
       userId,
       email,
+      friends: state.friendIds.map((id) => state.users.find((user) => user.id === id)).filter((u): u is User => Boolean(u)),
       getUser,
       getCircle,
+      reloadSocial,
+      runSocial,
       react: (postId, reaction) => dispatch({ type: "react", postId, reaction }),
       addPost: (post) => dispatch({ type: "addPost", post }),
       vote: (pollId, optionId) => dispatch({ type: "vote", pollId, optionId }),
       addPoll: (poll) => dispatch({ type: "addPoll", poll }),
       closePoll: (pollId) => dispatch({ type: "closePoll", pollId }),
-      addCircle: (circle) => dispatch({ type: "addCircle", circle }),
-      invite: (circleId, userIds) => dispatch({ type: "invite", circleId, userIds }),
-      updateProfile: (changes) => dispatch({ type: "updateProfile", changes }),
+      updateProfile: (changes) => dispatch({ type: "updateProfile", userId, changes }),
       updateSettings: (changes) => dispatch({ type: "updateSettings", changes }),
-      showToast: (message, tone = "success") => dispatch({ type: "toast", message, tone }),
-    }),
-    [state, userId, email, getUser, getCircle],
-  );
+      showToast,
+    };
+  }, [state, me, userId, email, getUser, getCircle, reloadSocial, runSocial, showToast]);
 
   return <VybzContext.Provider value={value}>{children}</VybzContext.Provider>;
 }

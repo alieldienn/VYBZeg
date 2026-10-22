@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Search } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import type { User } from "@/lib/types";
@@ -14,6 +15,18 @@ type FriendPickerProps = {
   disabled?: Record<string, string>;
 };
 
+/** Shown instead of the list when you have no friends yet. */
+function NoFriendsYet() {
+  return (
+    <div className="rounded-2xl border border-dashed border-line-strong px-4 py-6 text-center text-sm text-muted">
+      <p>You can only invite friends, and you haven&apos;t added any yet.</p>
+      <Link href="/friends" className="mt-2 inline-block font-semibold text-brand-soft hover:underline">
+        Add friends by username
+      </Link>
+    </div>
+  );
+}
+
 /** Searchable list of friends with checkboxes. */
 export function FriendPicker({ friends, selected, onChange, disabled = {} }: FriendPickerProps) {
   const [query, setQuery] = useState("");
@@ -21,6 +34,8 @@ export function FriendPicker({ friends, selected, onChange, disabled = {} }: Fri
   const matches = friends.filter(
     (friend) => !q || friend.name.toLowerCase().includes(q) || friend.username.toLowerCase().includes(q),
   );
+
+  if (friends.length === 0) return <NoFriendsYet />;
 
   function toggle(id: string) {
     onChange(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);

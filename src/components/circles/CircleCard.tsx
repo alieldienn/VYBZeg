@@ -6,10 +6,10 @@ import { AvatarStack } from "@/components/ui/Avatar";
 import { THEME_GRADIENTS } from "@/lib/constants";
 import { useVybz } from "@/lib/store";
 import type { Circle, User } from "@/lib/types";
-import { cn, pluralize } from "@/lib/utils";
+import { agoText, cn, pluralize } from "@/lib/utils";
 
 export function CircleCard({ circle }: { circle: Circle }) {
-  const { getUser } = useVybz();
+  const { me, getUser } = useVybz();
   const members = circle.memberIds.map(getUser).filter((u): u is User => Boolean(u));
   const latest = circle.activity[0];
   const latestUser = latest ? getUser(latest.userId) : undefined;
@@ -34,7 +34,7 @@ export function CircleCard({ circle }: { circle: Circle }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="truncate font-display text-lg font-semibold">{circle.name}</h2>
-            <p className="truncate text-sm text-muted">{circle.description}</p>
+            {circle.description && <p className="truncate text-sm text-muted">{circle.description}</p>}
           </div>
           {circle.newToday > 0 && (
             <span className="shrink-0 rounded-full bg-brand px-2.5 py-1 text-xs font-bold text-white">
@@ -48,8 +48,8 @@ export function CircleCard({ circle }: { circle: Circle }) {
         </div>
         {latest && latestUser && (
           <p className="mt-3 truncate border-t border-line pt-3 text-xs text-muted">
-            <span className="font-medium text-fg">{latestUser.name.split(" ")[0]}</span> {latest.text} ·{" "}
-            {latest.timeLabel}
+            <span className="font-medium text-fg">{latest.userId === me.id ? "You" : latestUser.name.split(" ")[0]}</span> {latest.text} ·{" "}
+            {agoText(latest.timeLabel)}
           </p>
         )}
       </div>

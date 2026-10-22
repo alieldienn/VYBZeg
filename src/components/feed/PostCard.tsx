@@ -37,7 +37,13 @@ export function PostCard({ post, author, preview = false, className }: PostCardP
             @{user.username} · {post.timeLabel}
           </p>
         </div>
-        {circle ? (
+        {circle && circle.sample ? (
+          // Sample circles from the demo data have no page to open.
+          <span className="flex max-w-[45%] items-center gap-1.5 rounded-full border border-line bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-muted">
+            <span aria-hidden>{circle.emoji}</span>
+            <span className="truncate">{circle.name}</span>
+          </span>
+        ) : circle ? (
           <Link
             href={`/circles/${circle.id}`}
             className="flex max-w-[45%] items-center gap-1.5 rounded-full border border-line bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-muted transition hover:text-fg"

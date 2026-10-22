@@ -1,20 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CalendarHeart, Flame, Heart, ImageIcon, PenLine, Sparkles, UserPlus, UsersRound, type LucideIcon } from "lucide-react";
+import {
+  CalendarHeart,
+  Flame,
+  Heart,
+  ImageIcon,
+  Loader2,
+  LogOut,
+  PenLine,
+  Sparkles,
+  Trash2,
+  UserPlus,
+  UsersRound,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { PostCard } from "@/components/feed/PostCard";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { NewPlanSheet } from "@/components/plans/NewPlanSheet";
 import { PollCard } from "@/components/plans/PollCard";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, buttonStyles } from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { Tag } from "@/components/ui/DemoNotice";
 import { REACTIONS, THEME_GRADIENTS } from "@/lib/constants";
-import { CURRENT_USER_ID } from "@/lib/sample-data";
+import { acceptInvite, cancelInvite, deleteCircle, leaveCircle, removeMember } from "@/lib/social";
 import { useVybz } from "@/lib/store";
-import type { ActivityKind, ReactionKey, User } from "@/lib/types";
-import { cn, pluralize, reactionCount } from "@/lib/utils";
+import type { ActivityKind, Circle, CircleInvite, CircleRole, ReactionKey, User } from "@/lib/types";
+import { agoText, cn, pluralize, reactionCount } from "@/lib/utils";
 import { InviteSheet } from "./InviteSheet";
 
 const ACTIVITY_ICONS: Record<ActivityKind, LucideIcon> = {
@@ -24,40 +40,135 @@ const ACTIVITY_ICONS: Record<ActivityKind, LucideIcon> = {
   react: Heart,
 };
 
-export function CircleDetail({ id }: { id: string }) {
-  const { getCircle, getUser, posts, polls } = useVybz();
-  const [inviting, setInviting] = useState(false);
-  const [planning, setPlanning] = useState(false);
-  const circle = getCircle(id);
+const ROLE_LABELS: Record<CircleRole, string> = { owner: "Owner", admin: "Admin", member: "Member" };
 
-  if (!circle) {
-    return (
-      <div className="mx-auto max-w-md py-24 text-center">
-        <p className="text-5xl" aria-hidden>
-          🫥
-        </p>
-        <h1 className="mt-4 font-display text-2xl font-bold">Circle not found</h1>
-        <p className="mt-2 text-sm text-muted">
-          It may have been deleted, or it was a demo circle that disappeared when the page refreshed.
-        </p>
-        <Link href="/circles" className={buttonStyles({ className: "mt-6" })}>
-          Back to circles
-        </Link>
-      </div>
+export function CircleDetail({ id }: { id: string }) {
+  const { circles, invites, social } = useVybz();
+  const circle = circles.find((c) => c.id === id);
+  const invite = invites.find((i) => i.circleId === id);
+
+  if (circle) return <MemberView circle={circle} />;
+  if (social.status === "loading") return <CircleSkeleton />;
+  if (invite) return <InvitePreview invite={invite} />;
+
+  return (
+    <div className="mx-auto max-w-md py-24 text-center">
+      <p className="text-5xl" aria-hidden>
+        🫥
+      </p>
+      <h1 className="mt-4 font-display text-2xl font-bold">Circle not found</h1>
+      <p className="mt-2 text-sm text-muted">
+        {social.status === "error"
+          ? social.error
+          : "It may have been deleted, or you're not a member. Circles are private: you need an invite to see one."}
+      </p>
+      <Link href="/circles" className={buttonStyles({ className: "mt-6" })}>
+        Back to circles
+      </Link>
+    </div>
+  );
+}
+
+export function CircleSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-5xl animate-pulse pt-16 lg:pt-24" role="status" aria-label="Loading circle">
+      <div className="h-56 rounded-[32px] bg-surface" />
+      <div className="mt-8 h-40 rounded-[28px] bg-surface" />
+    </div>
+  );
+}
+
+/** What someone invited (but not yet a member) sees: no posts or members, just the invite. */
+function InvitePreview({ invite }: { invite: CircleInvite }) {
+  const router = useRouter();
+  const { getUser, runSocial } = useVybz();
+  const [busy, setBusy] = useState<"join" | "decline" | null>(null);
+  const inviter = getUser(invite.inviterId);
+
+  async function respond(join: boolean) {
+    setBusy(join ? "join" : "decline");
+    const ok = await runSocial(
+      join ? acceptInvite(invite.circleId) : cancelInvite(invite.id),
+      join ? `You joined ${invite.circleEmoji} ${invite.circleName}` : "Invite declined",
     );
+    setBusy(null);
+    if (ok && !join) router.push("/circles");
   }
 
+  return (
+    <div className="mx-auto w-full max-w-xl">
+      <PageHeader title={invite.circleName} back={{ href: "/circles", label: "Circles" }} />
+      <section className={cn("rounded-[32px] p-6 text-center sm:p-8", THEME_GRADIENTS[invite.circleColor])}>
+        <span className="text-6xl drop-shadow-lg" aria-hidden>
+          {invite.circleEmoji}
+        </span>
+        <h2 className="mt-3 font-display text-2xl font-bold text-white">{invite.circleName}</h2>
+        <p className="mt-2 text-sm font-medium text-white/90">
+          {inviter ? `${inviter.name} (@${inviter.username})` : "A friend"} invited you to join.
+        </p>
+        <p className="mt-1 text-xs text-white/75">Join to see the members, posts and plans inside.</p>
+        <div className="mt-6 flex justify-center gap-2">
+          <Button variant="glass" onClick={() => respond(false)} disabled={busy !== null}>
+            {busy === "decline" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            Decline
+          </Button>
+          <Button variant="light" onClick={() => respond(true)} disabled={busy !== null}>
+            {busy === "join" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            Join circle
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+type Confirm = { kind: "leave" } | { kind: "delete" } | { kind: "remove"; member: User };
+
+function MemberView({ circle }: { circle: Circle }) {
+  const router = useRouter();
+  const { me, getUser, posts, polls, runSocial } = useVybz();
+  const [inviting, setInviting] = useState(false);
+  const [planning, setPlanning] = useState(false);
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
+
+  const myRole = circle.roles?.[me.id] ?? "member";
+  const isAdmin = myRole === "owner" || myRole === "admin";
   const members = circle.memberIds.map(getUser).filter((u): u is User => Boolean(u));
-  const invited = circle.invitedIds.map(getUser).filter((u): u is User => Boolean(u));
+  // Sample posts/polls until Stages 6–7; demo posts you make to this circle appear here too.
   const circlePosts = posts.filter((post) => post.circleId === circle.id);
   const circlePolls = polls.filter((poll) => poll.circleId === circle.id);
 
-  // Simple numbers for the Weekly Recap preview, worked out from the sample data.
   const reactionTotals = REACTIONS.map((r) => ({
     ...r,
     total: circlePosts.reduce((sum, post) => sum + reactionCount(post, r.key as ReactionKey), 0),
   }));
   const topReaction = reactionTotals.reduce((best, r) => (r.total > best.total ? r : best), reactionTotals[0]);
+
+  function canRemove(memberId: string) {
+    const role = circle.roles?.[memberId];
+    if (memberId === me.id || role === "owner") return false;
+    return myRole === "owner" || (myRole === "admin" && role === "member");
+  }
+
+  async function cancel(inviteId: string) {
+    setCancelling(inviteId);
+    await runSocial(cancelInvite(inviteId), "Invite cancelled");
+    setCancelling(null);
+  }
+
+  async function confirmAction() {
+    if (!confirm) return;
+    if (confirm.kind === "remove") {
+      return runSocial(removeMember(circle.id, confirm.member.id), `${confirm.member.name} was removed`);
+    }
+    const ok =
+      confirm.kind === "leave"
+        ? await runSocial(leaveCircle(me.id, circle.id), `You left ${circle.name}`)
+        : await runSocial(deleteCircle(circle.id), `${circle.name} was deleted`);
+    if (ok) router.push("/circles");
+    return ok;
+  }
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -71,16 +182,20 @@ export function CircleDetail({ id }: { id: string }) {
           <span className="text-5xl drop-shadow-lg" aria-hidden>
             {circle.emoji}
           </span>
-          <p className="mt-3 max-w-md text-[15px] font-medium text-white/90">{circle.description}</p>
+          {circle.description && (
+            <p className="mt-3 max-w-md text-[15px] font-medium text-white/90">{circle.description}</p>
+          )}
           <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-white">
             <span className="flex items-center gap-1 rounded-full bg-black/30 px-3 py-1.5 backdrop-blur">
               <UsersRound className="h-3.5 w-3.5" aria-hidden />
               {pluralize(members.length, "member")}
             </span>
-            <span className="flex items-center gap-1 rounded-full bg-black/30 px-3 py-1.5 backdrop-blur">
-              <Flame className="h-3.5 w-3.5 text-warning" aria-hidden />
-              {circle.streak}-day streak
-            </span>
+            {circle.streak > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-black/30 px-3 py-1.5 backdrop-blur">
+                <Flame className="h-3.5 w-3.5 text-warning" aria-hidden />
+                {circle.streak}-day streak
+              </span>
+            )}
             {circle.newToday > 0 && (
               <span className="rounded-full bg-black/30 px-3 py-1.5 backdrop-blur">{circle.newToday} new today</span>
             )}
@@ -168,20 +283,52 @@ export function CircleDetail({ id }: { id: string }) {
               </button>
             </div>
             <ul className="mt-3 space-y-1">
-              {members.map((member) => (
-                <li key={member.id} className="flex items-center gap-3 py-1.5">
-                  <Avatar user={member} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{member.name}</span>
-                  {member.id === CURRENT_USER_ID && <Tag tone="brand">You</Tag>}
-                </li>
-              ))}
-              {invited.map((user) => (
-                <li key={user.id} className="flex items-center gap-3 py-1.5 opacity-60">
-                  <Avatar user={user} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{user.name}</span>
-                  <Tag tone="soon">Invited</Tag>
-                </li>
-              ))}
+              {members.map((member) => {
+                const role = circle.roles?.[member.id] ?? "member";
+                return (
+                  <li key={member.id} className="flex items-center gap-3 py-1.5">
+                    <Avatar user={member} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{member.name}</span>
+                      <span className="block truncate text-xs text-subtle">@{member.username}</span>
+                    </span>
+                    {member.id === me.id && <Tag tone="brand">You</Tag>}
+                    {role !== "member" && <Tag tone="soon">{ROLE_LABELS[role]}</Tag>}
+                    {canRemove(member.id) && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirm({ kind: "remove", member })}
+                        className="rounded-full p-1.5 text-subtle transition hover:bg-white/5 hover:text-danger"
+                        aria-label={`Remove ${member.name}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+              {(circle.invites ?? []).map((pending) => {
+                const user = getUser(pending.inviteeId);
+                const canCancel = pending.inviterId === me.id || isAdmin;
+                return (
+                  <li key={pending.id} className="flex items-center gap-3 py-1.5">
+                    {user && <Avatar user={user} size="sm" className="opacity-60" />}
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-muted">{user?.name ?? "Invited friend"}</span>
+                    <Tag tone="soon">Invited</Tag>
+                    {canCancel && (
+                      <button
+                        type="button"
+                        onClick={() => cancel(pending.id)}
+                        disabled={cancelling === pending.id}
+                        className="rounded-full p-1.5 text-subtle transition hover:bg-white/5 hover:text-fg disabled:opacity-50"
+                        aria-label={`Cancel invite for ${user?.name ?? "this friend"}`}
+                      >
+                        {cancelling === pending.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </section>
 
@@ -200,21 +347,54 @@ export function CircleDetail({ id }: { id: string }) {
                     </span>
                     <p className="text-sm leading-snug text-muted">
                       <span className="font-semibold text-fg">
-                        {item.userId === CURRENT_USER_ID ? "You" : user?.name.split(" ")[0]}
+                        {item.userId === me.id ? "You" : user?.name.split(" ")[0]}
                       </span>{" "}
                       {item.text}
-                      <span className="block text-xs text-subtle">{item.timeLabel} ago</span>
+                      <span className="block text-xs text-subtle">{agoText(item.timeLabel)}</span>
                     </p>
                   </li>
                 );
               })}
             </ol>
           </section>
+
+          {myRole === "owner" ? (
+            <Button variant="danger" className="w-full" onClick={() => setConfirm({ kind: "delete" })}>
+              <Trash2 className="h-4 w-4" />
+              Delete circle
+            </Button>
+          ) : (
+            <Button variant="secondary" className="w-full" onClick={() => setConfirm({ kind: "leave" })}>
+              <LogOut className="h-4 w-4" />
+              Leave circle
+            </Button>
+          )}
         </div>
       </div>
 
       <InviteSheet circle={circle} open={inviting} onClose={() => setInviting(false)} />
       <NewPlanSheet open={planning} onClose={() => setPlanning(false)} defaultCircleId={circle.id} />
+      <ConfirmSheet
+        open={confirm !== null}
+        onClose={() => setConfirm(null)}
+        danger
+        title={
+          confirm?.kind === "delete"
+            ? `Delete ${circle.name}?`
+            : confirm?.kind === "leave"
+              ? `Leave ${circle.name}?`
+              : `Remove ${confirm?.kind === "remove" ? confirm.member.name : ""}?`
+        }
+        description={
+          confirm?.kind === "delete"
+            ? "This deletes the circle for everyone, including its posts and plans. This can't be undone."
+            : confirm?.kind === "leave"
+              ? "You'll stop seeing this circle's posts and plans. You'll need a new invite to come back."
+              : "They'll lose access to this circle's posts and plans. They'd need a new invite to come back."
+        }
+        confirmLabel={confirm?.kind === "delete" ? "Delete circle" : confirm?.kind === "leave" ? "Leave" : "Remove"}
+        onConfirm={confirmAction}
+      />
     </div>
   );
 }

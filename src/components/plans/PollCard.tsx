@@ -5,7 +5,6 @@ import { CalendarDays, Check, Clock, Lock, PartyPopper } from "lucide-react";
 import { Avatar, AvatarStack } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { PLAN_CATEGORIES } from "@/lib/constants";
-import { CURRENT_USER_ID } from "@/lib/sample-data";
 import { useVybz } from "@/lib/store";
 import type { Poll, User } from "@/lib/types";
 import { cn, leadingOption, optionVotes, pluralize, totalVotes } from "@/lib/utils";
@@ -19,7 +18,7 @@ export function PollCard({ poll, showCircle = true }: { poll: Poll; showCircle?:
   const decided = poll.status === "decided";
   const showResults = decided || poll.myVote !== null;
   const leader = leadingOption(poll);
-  const isMine = poll.creatorId === CURRENT_USER_ID;
+  const isMine = poll.creatorId === me.id;
 
   function handleVote(optionId: string) {
     const removing = poll.myVote === optionId;
@@ -42,9 +41,15 @@ export function PollCard({ poll, showCircle = true }: { poll: Poll; showCircle?:
             <>
               {" "}
               in{" "}
-              <Link href={`/circles/${circle.id}`} className="font-medium text-fg hover:underline">
-                {circle.emoji} {circle.name}
-              </Link>
+              {circle.sample ? (
+                <span className="font-medium text-fg">
+                  {circle.emoji} {circle.name}
+                </span>
+              ) : (
+                <Link href={`/circles/${circle.id}`} className="font-medium text-fg hover:underline">
+                  {circle.emoji} {circle.name}
+                </Link>
+              )}
             </>
           )}
         </p>

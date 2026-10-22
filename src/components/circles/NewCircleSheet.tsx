@@ -2,62 +2,73 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { CIRCLE_EMOJIS, LIMITS, THEME_GRADIENTS, THEME_LABELS } from "@/lib/constants";
-import { CURRENT_USER_ID } from "@/lib/sample-data";
+import { createCircle } from "@/lib/social";
 import { useVybz } from "@/lib/store";
 import type { ThemeColor } from "@/lib/types";
-import { cn, newId } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { FriendPicker } from "./FriendPicker";
 
 const COLORS = Object.keys(THEME_GRADIENTS) as ThemeColor[];
+const DESCRIPTION_MAX = 120;
 
 export function NewCircleSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
-  const { users, addCircle, showToast } = useVybz();
+  const { friends, reloadSocial, showToast } = useVybz();
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [emoji, setEmoji] = useState(CIRCLE_EMOJIS[0]);
   const [color, setColor] = useState<ThemeColor>("violet");
   const [invited, setInvited] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const canCreate = name.trim().length >= 2;
+  const canCreate = name.trim().length >= 2 && !saving;
 
-  function create() {
+  async function create() {
     if (!canCreate) return;
-    const id = newId("c");
-    addCircle({
-      id,
-      name: name.trim(),
-      emoji,
-      color,
-      description: "A new circle. Say hi!",
-      memberIds: [CURRENT_USER_ID],
-      invitedIds: invited,
-      activity: [{ id: newId("a"), userId: CURRENT_USER_ID, kind: "join", text: "created the circle", timeLabel: "now" }],
-      streak: 0,
-      newToday: 0,
-    });
-    showToast(`${emoji} ${name.trim()} created (demo)`);
+    setSaving(true);
+    setError(null);
+    const result = await createCircle({ name, description, emoji, color, inviteeIds: invited });
+    if (result.error || !result.id) {
+      setSaving(false);
+      setError(result.error ?? "We couldn't create your circle. Please try again.");
+      if (result.expired) router.push("/login");
+      return;
+    }
+    await reloadSocial();
+    showToast(result.warning ?? `${emoji} ${name.trim()} created`, result.warning ? "error" : "success");
     setName("");
+    setDescription("");
     setInvited([]);
+    setSaving(false);
     onClose();
-    router.push(`/circles/${id}`);
+    router.push(`/circles/${result.id}`);
   }
 
   return (
     <Sheet
       open={open}
-      onClose={onClose}
+      onClose={saving ? () => {} : onClose}
       title="New circle"
-      description="A private space for your closest people."
+      description="A private space for your closest people. Only people you invite can join."
       footer={
-        <Button size="lg" className="w-full" onClick={create} disabled={!canCreate}>
-          {canCreate ? "Create circle" : "Give it a name"}
+        <Button size="lg" className="w-full" onClick={create} disabled={!canCreate} aria-busy={saving}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+          {saving ? "Creating…" : name.trim().length >= 2 ? "Create circle" : "Give it a name"}
         </Button>
       }
     >
       <div className="space-y-6">
+        {error && (
+          <p role="alert" className="rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">
+            {error}
+          </p>
+        )}
+
         <div className={cn("flex h-28 items-center justify-center rounded-3xl text-5xl transition-all", THEME_GRADIENTS[color])}>
           <span aria-hidden>{emoji}</span>
         </div>
@@ -73,6 +84,23 @@ export function NewCircleSheet({ open, onClose }: { open: boolean; onClose: () =
             value={name}
             onChange={(event) => setName(event.target.value.slice(0, LIMITS.circleName))}
             placeholder="e.g. Gym Rats, Cousins, Uni Gang"
+            className="h-12 w-full rounded-2xl border border-line bg-elevated px-4 text-[15px] placeholder:text-subtle focus:border-brand/60 focus:outline-none"
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-2 flex items-center justify-between text-sm font-medium">
+            <span>
+              Description <span className="font-normal text-subtle">(optional)</span>
+            </span>
+            <span className="text-xs font-normal text-subtle">
+              {description.length}/{DESCRIPTION_MAX}
+            </span>
+          </span>
+          <input
+            value={description}
+            onChange={(event) => setDescription(event.target.value.slice(0, DESCRIPTION_MAX))}
+            placeholder="What's this circle about?"
             className="h-12 w-full rounded-2xl border border-line bg-elevated px-4 text-[15px] placeholder:text-subtle focus:border-brand/60 focus:outline-none"
           />
         </label>
@@ -123,11 +151,7 @@ export function NewCircleSheet({ open, onClose }: { open: boolean; onClose: () =
           <p className="mb-2 text-sm font-medium">
             Invite friends <span className="font-normal text-subtle">(optional)</span>
           </p>
-          <FriendPicker
-            friends={users.filter((user) => user.id !== CURRENT_USER_ID)}
-            selected={invited}
-            onChange={setInvited}
-          />
+          <FriendPicker friends={friends} selected={invited} onChange={setInvited} />
         </div>
       </div>
     </Sheet>

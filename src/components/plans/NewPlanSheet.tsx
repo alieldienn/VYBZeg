@@ -5,7 +5,6 @@ import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { LIMITS, PLAN_CATEGORIES, PLAN_SUGGESTIONS } from "@/lib/constants";
-import { CURRENT_USER_ID } from "@/lib/sample-data";
 import { useVybz } from "@/lib/store";
 import type { PlanCategory } from "@/lib/types";
 import { cn, newId } from "@/lib/utils";
@@ -23,7 +22,7 @@ export function NewPlanSheet({
   onClose: () => void;
   defaultCircleId?: string;
 }) {
-  const { circles, addPoll, showToast } = useVybz();
+  const { me, circles, addPoll, showToast } = useVybz();
   const [question, setQuestion] = useState("");
   const [circleId, setCircleId] = useState(defaultCircleId ?? circles[0]?.id ?? "");
   const [when, setWhen] = useState(WHEN_CHOICES[2]);
@@ -57,7 +56,7 @@ export function NewPlanSheet({
     addPoll({
       id: newId("poll"),
       circleId,
-      creatorId: CURRENT_USER_ID,
+      creatorId: me.id,
       question: question.trim(),
       whenLabel: when,
       deadlineLabel: "Closes in 24h",

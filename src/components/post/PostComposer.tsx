@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { DemoNotice, Tag } from "@/components/ui/DemoNotice";
 import { Segmented } from "@/components/ui/Segmented";
 import { LIMITS, THEME_GRADIENTS, THEME_LABELS } from "@/lib/constants";
-import { CURRENT_USER_ID, PROMPTS, TODAY_PROMPT_ID } from "@/lib/sample-data";
+import { PROMPTS, TODAY_PROMPT_ID } from "@/lib/sample-data";
 import { useVybz } from "@/lib/store";
 import type { Post, ThemeColor } from "@/lib/types";
 import { cn, newId } from "@/lib/utils";
@@ -75,7 +75,7 @@ export function PostComposer() {
 
   const draft: Post = {
     id: "draft",
-    authorId: CURRENT_USER_ID,
+    authorId: me.id,
     circleId,
     promptId,
     kind: mode,

@@ -42,6 +42,23 @@ export function leadingOption(poll: Poll) {
   );
 }
 
+/** Short "time ago" label like the sample data uses: "now", "5m", "3h", "2d", "4w". */
+export function timeAgo(iso: string, now = Date.now()) {
+  const minutes = Math.floor((now - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return `${Math.floor(days / 7)}w`;
+}
+
+/** "5m ago", or "just now". */
+export function agoText(label: string) {
+  return label === "now" ? "just now" : `${label} ago`;
+}
+
 export function pluralize(count: number, word: string, plural = `${word}s`) {
   return `${count} ${count === 1 ? word : plural}`;
 }

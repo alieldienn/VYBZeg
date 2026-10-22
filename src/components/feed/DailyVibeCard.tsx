@@ -4,18 +4,18 @@ import Link from "next/link";
 import { ArrowRight, Check, Flame } from "lucide-react";
 import { AvatarStack } from "@/components/ui/Avatar";
 import { buttonStyles } from "@/components/ui/Button";
-import { CURRENT_USER_ID, PROMPTS, SAMPLE_STREAK, TODAY_ANSWERED_COUNT, TODAY_PROMPT_ID } from "@/lib/sample-data";
+import { PROMPTS, SAMPLE_STREAK, TODAY_ANSWERED_COUNT, TODAY_PROMPT_ID } from "@/lib/sample-data";
 import { useVybz } from "@/lib/store";
 import type { User } from "@/lib/types";
 
 /** Today's shared prompt. The daily reason to open the app. */
 export function DailyVibeCard() {
-  const { posts, getUser } = useVybz();
+  const { me, posts, getUser } = useVybz();
   const prompt = PROMPTS.find((p) => p.id === TODAY_PROMPT_ID)!;
   const todaysPosts = posts.filter((post) => post.promptId === TODAY_PROMPT_ID);
-  const postedToday = todaysPosts.some((post) => post.authorId === CURRENT_USER_ID);
+  const postedToday = todaysPosts.some((post) => post.authorId === me.id);
   const answeredBy = todaysPosts
-    .filter((post) => post.authorId !== CURRENT_USER_ID)
+    .filter((post) => post.authorId !== me.id)
     .map((post) => getUser(post.authorId))
     .filter((user): user is User => Boolean(user));
   const streak = SAMPLE_STREAK + (postedToday ? 1 : 0);

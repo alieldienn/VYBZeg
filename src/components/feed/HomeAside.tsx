@@ -50,6 +50,15 @@ export function HomeAside() {
             See all
           </Link>
         </div>
+        {circles.length === 0 && (
+          <p className="mt-3 text-sm text-muted">
+            No circles yet.{" "}
+            <Link href="/circles" className="font-medium text-brand-soft hover:underline">
+              Start one
+            </Link>{" "}
+            or wait for an invite.
+          </p>
+        )}
         <ul className="mt-2">
           {circles.slice(0, 4).map((circle) => (
             <li key={circle.id}>

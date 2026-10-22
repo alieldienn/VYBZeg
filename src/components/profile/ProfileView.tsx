@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Bell, Camera, Flame, Globe2, Loader2, LogOut, MapPin, Palette, PenLine, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -14,40 +15,26 @@ import { Switch } from "@/components/ui/Switch";
 import { signOut } from "@/lib/auth/actions";
 import { REMINDER_TIMES, THEME_GRADIENTS } from "@/lib/constants";
 import { setAvatar } from "@/lib/profile/actions";
-import { CURRENT_USER_ID, SAMPLE_STREAK, TODAY_PROMPT_ID } from "@/lib/sample-data";
+import { SAMPLE_STREAK, TODAY_PROMPT_ID } from "@/lib/sample-data";
 import { useVybz } from "@/lib/store";
-import { createClient } from "@/lib/supabase/client";
 import { deleteAvatar, uploadAvatar } from "@/lib/supabase/uploads";
 import { cn } from "@/lib/utils";
 import { EditProfileSheet } from "./EditProfileSheet";
 
 export function ProfileView() {
   const router = useRouter();
-  const { me, userId, email, posts, circles, settings, updateSettings, updateProfile, showToast } = useVybz();
+  const { me, userId, email, posts, circles, friendIds, requests, social, settings, updateSettings, updateProfile, showToast } =
+    useVybz();
   const [editing, setEditing] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [friendCount, setFriendCount] = useState<number | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
 
-  // Sample data until posts and circles are connected (Stages 5–6).
-  const myPosts = posts.filter((post) => post.authorId === CURRENT_USER_ID);
+  // Posts are sample data until Stage 6; circles are real.
+  const myPosts = posts.filter((post) => post.authorId === me.id);
   const postedToday = myPosts.some((post) => post.promptId === TODAY_PROMPT_ID);
-  const myCircles = circles.filter((circle) => circle.memberIds.includes(CURRENT_USER_ID));
-
-  // Real friend count. Row Level Security only returns your own friendships.
-  useEffect(() => {
-    let cancelled = false;
-    createClient()
-      .from("friendships")
-      .select("requester_id", { count: "exact", head: true })
-      .eq("status", "accepted")
-      .then(({ count, error }) => {
-        if (!cancelled && !error) setFriendCount(count ?? 0);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const myCircles = circles.filter((circle) => circle.memberIds.includes(me.id));
+  const socialReady = social.status === "ready";
+  const incoming = requests.filter((r) => r.direction === "incoming").length;
 
   async function applyAvatar(newPath: string | null) {
     const result = await setAvatar(newPath);
@@ -145,11 +132,15 @@ export function ProfileView() {
           <dl className="mt-6 grid grid-cols-4 gap-2 text-center">
             <Stat value={myPosts.length} label="Vibes" />
             <Stat value={SAMPLE_STREAK + (postedToday ? 1 : 0)} label="Streak" icon={<Flame className="h-4 w-4 text-warning" aria-hidden />} />
-            <Stat value={myCircles.length} label="Circles" />
-            <Stat value={friendCount ?? "–"} label="Friends" />
+            <Stat value={socialReady ? myCircles.length : "–"} label="Circles" href="/circles" />
+            <Stat
+              value={socialReady ? friendIds.length : "–"}
+              label={incoming ? `Friends · ${incoming} new` : "Friends"}
+              href="/friends"
+            />
           </dl>
           <p className="mt-2 text-center text-[11px] text-subtle">
-            Vibes, streak and circles show sample data until posting and circles are connected.
+            Vibes and streak show sample data until posting is connected.
           </p>
         </div>
       </section>
@@ -283,14 +274,16 @@ export function ProfileView() {
   );
 }
 
-function Stat({ value, label, icon }: { value: number | string; label: string; icon?: ReactNode }) {
+function Stat({ value, label, icon, href }: { value: number | string; label: string; icon?: ReactNode; href?: string }) {
   return (
-    <div className="rounded-2xl bg-elevated px-1 py-3">
+    <div className={cn("relative rounded-2xl bg-elevated px-1 py-3", href && "transition hover:bg-raised")}>
       <dd className="flex items-center justify-center gap-1 font-display text-xl font-bold tabular-nums">
         {icon}
         {value}
       </dd>
       <dt className="text-[11px] text-muted">{label}</dt>
+      {/* The whole tile is clickable; the link sits on top so the dl/dd/dt structure stays valid. */}
+      {href && <Link href={href} className="absolute inset-0 rounded-2xl" aria-label={`${label}: ${value}`} />}
     </div>
   );
 }

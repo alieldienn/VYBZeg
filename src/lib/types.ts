@@ -56,6 +56,8 @@ export type CircleActivity = {
   timeLabel: string;
 };
 
+export type CircleRole = "owner" | "admin" | "member";
+
 export type Circle = {
   id: string;
   name: string;
@@ -69,6 +71,30 @@ export type Circle = {
   /** Days in a row someone in the circle posted. */
   streak: number;
   newToday: number;
+  /** Role of each member, by user id (real circles only). */
+  roles?: Record<string, CircleRole>;
+  /** Pending invites, so the right people can cancel them (real circles only). */
+  invites?: { id: string; inviteeId: string; inviterId: string }[];
+  /** True for leftover sample circles used by the sample feed and plans. */
+  sample?: boolean;
+};
+
+/** An invitation for the logged-in user to join a circle. */
+export type CircleInvite = {
+  id: string;
+  circleId: string;
+  circleName: string;
+  circleEmoji: string;
+  circleColor: ThemeColor;
+  inviterId: string;
+  createdAt: string;
+};
+
+/** A pending friend request involving the logged-in user. */
+export type FriendRequest = {
+  userId: string;
+  direction: "incoming" | "outgoing";
+  createdAt: string;
 };
 
 export type PlanCategory =
