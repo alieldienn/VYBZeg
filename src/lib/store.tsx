@@ -1,10 +1,11 @@
 "use client";
 
 /*
- * App-wide state for the demo.
- * Holds posts, circles, polls, profile and settings in memory so every
- * screen sees the same data. Nothing is saved: refreshing the page resets it.
- * In a later milestone these actions will call Supabase instead.
+ * App-wide state shared by every screen.
+ * Milestone 2 is moving this to Supabase one feature at a time:
+ *  - Your own profile (name, username, photo) is REAL, loaded on the server.
+ *  - Posts, circles, polls, other users and settings are still sample data held
+ *    in memory (refreshing resets them) until their stage is connected.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import {
@@ -108,6 +109,8 @@ function reducer(state: State, action: Action): State {
 
 type VybzContextValue = State & {
   me: User;
+  /** Email address of the logged-in account. */
+  email: string;
   getUser: (id: string) => User | undefined;
   getCircle: (id: string) => Circle | undefined;
   react: (postId: string, reaction: ReactionKey) => void;
@@ -124,8 +127,36 @@ type VybzContextValue = State & {
 
 const VybzContext = createContext<VybzContextValue | null>(null);
 
-export function VybzProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+/**
+ * Temporary bridge until posts/circles/polls come from the database: the real
+ * profile takes the place of the sample "me" user (keeping the sample id) so
+ * the sample feed, circles and polls still line up with it.
+ */
+function withRealMe(me: User): State {
+  return {
+    ...initialState,
+    users: SAMPLE_USERS.map((user) => (user.id === CURRENT_USER_ID ? { ...me, id: CURRENT_USER_ID } : user)),
+  };
+}
+
+export function VybzProvider({ me, email, children }: { me: User; email: string; children: ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, me, withRealMe);
+
+  // One-off messages passed in the address after onboarding or a password reset.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const message = params.has("welcome")
+      ? `Welcome to VYBZ, ${me.name.split(" ")[0]}!`
+      : params.get("password") === "updated"
+        ? "Password updated"
+        : null;
+    if (!message) return;
+    dispatch({ type: "toast", message });
+    params.delete("welcome");
+    params.delete("password");
+    const query = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
+  }, [me.name]);
 
   // Auto-hide the toast after a few seconds.
   useEffect(() => {
@@ -147,6 +178,7 @@ export function VybzProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       me: state.users.find((user) => user.id === CURRENT_USER_ID)!,
+      email,
       getUser,
       getCircle,
       react: (postId, reaction) => dispatch({ type: "react", postId, reaction }),
@@ -160,7 +192,7 @@ export function VybzProvider({ children }: { children: ReactNode }) {
       updateSettings: (changes) => dispatch({ type: "updateSettings", changes }),
       showToast: (message) => dispatch({ type: "toast", message }),
     }),
-    [state, getUser, getCircle],
+    [state, email, getUser, getCircle],
   );
 
   return <VybzContext.Provider value={value}>{children}</VybzContext.Provider>;

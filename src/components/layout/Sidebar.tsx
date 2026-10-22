@@ -62,8 +62,8 @@ export function SidebarPanel({ pathname }: { pathname: string | null }) {
 
       <div className="mt-auto space-y-3">
         <div className="rounded-2xl border border-line bg-surface p-3.5 text-xs leading-relaxed text-muted">
-          <Tag>Demo build</Tag>
-          <p className="mt-2">Sample data only. Nothing you do here is saved or shared.</p>
+          <Tag>Beta</Tag>
+          <p className="mt-2">Your account is real. The feed, circles and plans still show sample data for now.</p>
         </div>
         <Link
           href="/profile"

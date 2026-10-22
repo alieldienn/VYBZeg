@@ -2,13 +2,15 @@
 
 import Image from "next/image";
 import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { Bell, Camera, Flame, Globe2, LogOut, MapPin, Palette, PenLine, ShieldCheck } from "lucide-react";
+import { useFormStatus } from "react-dom";
+import { Bell, Camera, Flame, Globe2, Loader2, LogOut, MapPin, Palette, PenLine, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { DemoNotice, Tag } from "@/components/ui/DemoNotice";
 import { Segmented } from "@/components/ui/Segmented";
 import { Switch } from "@/components/ui/Switch";
+import { signOut } from "@/lib/auth/actions";
 import { LIMITS, REMINDER_TIMES, THEME_GRADIENTS } from "@/lib/constants";
 import { CURRENT_USER_ID, SAMPLE_FRIEND_COUNT, SAMPLE_STREAK, TODAY_PROMPT_ID } from "@/lib/sample-data";
 import { useVybz } from "@/lib/store";
@@ -16,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { EditProfileSheet } from "./EditProfileSheet";
 
 export function ProfileView() {
-  const { me, posts, circles, settings, updateSettings, updateProfile, showToast } = useVybz();
+  const { me, email, posts, circles, settings, updateSettings, updateProfile, showToast } = useVybz();
   const [editing, setEditing] = useState(false);
   const photoInput = useRef<HTMLInputElement>(null);
 
@@ -219,19 +221,16 @@ export function ProfileView() {
         </SettingsGroup>
 
         <SettingsGroup icon={<Globe2 className="h-4 w-4" />} title="Account">
-          <div className="flex items-center justify-between gap-4 py-3.5">
-            <div>
+          <form action={signOut} className="flex items-center justify-between gap-4 py-3.5">
+            <div className="min-w-0">
               <p className="text-sm font-medium">Log out</p>
-              <p className="mt-0.5 text-xs text-muted">Accounts and sign-in arrive with the backend.</p>
+              <p className="mt-0.5 truncate text-xs text-muted">Signed in as {email}</p>
             </div>
-            <Button variant="danger" size="sm" disabled>
-              <LogOut className="h-3.5 w-3.5" />
-              Log out
-            </Button>
-          </div>
+            <LogOutButton />
+          </form>
         </SettingsGroup>
 
-        <p className="pb-4 text-center text-xs text-subtle">VYBZ v0.1 · Made in Cairo · Demo build</p>
+        <p className="pb-4 text-center text-xs text-subtle">VYBZ v0.2 · Made in Cairo · Beta</p>
       </div>
 
       <EditProfileSheet open={editing} onClose={() => setEditing(false)} />
@@ -248,6 +247,16 @@ function Stat({ value, label, icon }: { value: number; label: string; icon?: Rea
       </dd>
       <dt className="text-[11px] text-muted">{label}</dt>
     </div>
+  );
+}
+
+function LogOutButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="danger" size="sm" disabled={pending}>
+      {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+      Log out
+    </Button>
   );
 }
 

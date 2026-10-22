@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Geist } from "next/font/google";
-import { AppShell } from "@/components/layout/AppShell";
-import { VybzProvider } from "@/lib/store";
 import "./globals.css";
 
 const geist = Geist({
@@ -31,11 +29,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geist.variable} ${bricolage.variable} antialiased`}>
-      <body>
-        <VybzProvider>
-          <AppShell>{children}</AppShell>
-        </VybzProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
