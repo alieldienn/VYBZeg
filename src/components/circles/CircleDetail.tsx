@@ -25,10 +25,11 @@ import { PollCard } from "@/components/plans/PollCard";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, buttonStyles } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
-import { Tag } from "@/components/ui/DemoNotice";
+import { Tag } from "@/components/ui/Tag";
 import { REACTIONS, THEME_GRADIENTS } from "@/lib/constants";
 import { acceptInvite, cancelInvite, deleteCircle, leaveCircle, removeMember } from "@/lib/social";
 import { daysAgoIso } from "@/lib/dates";
+import { usePolls } from "@/lib/hooks/usePolls";
 import { usePosts } from "@/lib/hooks/usePosts";
 import { useVybz } from "@/lib/store";
 import type { ActivityKind, Circle, CircleInvite, CircleRole, ReactionKey, User } from "@/lib/types";
@@ -128,22 +129,24 @@ type Confirm = { kind: "leave" } | { kind: "delete" } | { kind: "remove"; member
 
 function MemberView({ circle }: { circle: Circle }) {
   const router = useRouter();
-  const { me, getUser, polls, runSocial } = useVybz();
+  const { me, getUser, runSocial } = useVybz();
   const [inviting, setInviting] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const feed = usePosts({ circleId: circle.id });
+  const plans = usePolls({ circleId: circle.id });
 
   const myRole = circle.roles?.[me.id] ?? "member";
   const isAdmin = myRole === "owner" || myRole === "admin";
   const members = circle.memberIds.map(getUser).filter((u): u is User => Boolean(u));
-  // Polls are sample data until Stage 7.
-  const circlePolls = polls.filter((poll) => poll.circleId === circle.id);
+  // Open plans first, then decided ones (each newest first).
+  const circlePolls = [...plans.polls].sort((a, b) => Number(a.status === "decided") - Number(b.status === "decided"));
 
-  // "This week" numbers from the loaded posts of the last 7 days.
+  // "This week" numbers from the loaded posts and plans of the last 7 days.
   const weekAgo = daysAgoIso(7);
   const weekPosts = feed.posts.filter((post) => post.createdAt >= weekAgo);
+  const weekPlans = plans.polls.filter((poll) => poll.createdAt >= weekAgo);
   const reactionTotals = REACTIONS.map((r) => ({
     ...r,
     total: weekPosts.reduce((sum, post) => sum + reactionCount(post, r.key as ReactionKey), 0),
@@ -234,7 +237,7 @@ function MemberView({ circle }: { circle: Circle }) {
             </div>
             <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
               <Stat label="Vibes shared" value={feed.status === "ready" ? `${weekPosts.length}${feed.hasMore && weekPosts.length === feed.posts.length ? "+" : ""}` : "–"} />
-              <Stat label="Plans made" value={String(circlePolls.length)} />
+              <Stat label="Plans made" value={plans.status === "ready" ? String(weekPlans.length) : "–"} />
               <Stat label="Top reaction" value={topReaction.total > 0 ? topReaction.emoji : "–"} />
             </dl>
             <p className="mt-4 text-xs text-muted">
@@ -249,7 +252,7 @@ function MemberView({ circle }: { circle: Circle }) {
               </h2>
               <div className="space-y-4">
                 {circlePolls.map((poll) => (
-                  <PollCard key={poll.id} poll={poll} showCircle={false} />
+                  <PollCard key={poll.id} poll={poll} showCircle={false} onChange={plans.updatePoll} />
                 ))}
               </div>
             </section>

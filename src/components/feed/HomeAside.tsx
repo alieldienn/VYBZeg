@@ -2,27 +2,37 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { Tag } from "@/components/ui/DemoNotice";
 import { PLAN_CATEGORIES } from "@/lib/constants";
+import { usePolls } from "@/lib/hooks/usePolls";
 import { useVybz } from "@/lib/store";
 import { leadingOption, optionVotes, totalVotes } from "@/lib/utils";
 
 /** Desktop-only right column on Home: open plans and circles at a glance. */
 export function HomeAside() {
-  const { polls, circles, social, getCircle } = useVybz();
-  const openPolls = polls.filter((poll) => poll.status === "open").slice(0, 3);
+  const { circles, social, getCircle } = useVybz();
+  const plans = usePolls();
+  const openPolls = plans.polls.filter((poll) => poll.status === "open").slice(0, 3);
 
   return (
     <aside className="sticky top-8 hidden space-y-5 self-start xl:block">
       <section className="rounded-[28px] border border-line bg-surface p-5">
         <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
-            Plans brewing <Tag>Sample</Tag>
-          </h2>
+          <h2 className="font-display text-lg font-semibold">Plans brewing</h2>
           <Link href="/plans" className="text-xs font-medium text-brand-soft hover:underline">
             See all
           </Link>
         </div>
+        {plans.status === "loading" && <div className="mt-3 h-24 animate-pulse rounded-2xl bg-elevated" role="status" aria-label="Loading plans" />}
+        {plans.status === "error" && <p className="mt-3 text-sm text-muted">{plans.error}</p>}
+        {plans.status === "ready" && openPolls.length === 0 && (
+          <p className="mt-3 text-sm text-muted">
+            Nothing to vote on.{" "}
+            <Link href="/plans" className="font-medium text-brand-soft hover:underline">
+              Make a plan
+            </Link>{" "}
+            and get the group moving.
+          </p>
+        )}
         <ul className="mt-3 space-y-2">
           {openPolls.map((poll) => {
             const leader = leadingOption(poll);
@@ -32,12 +42,13 @@ export function HomeAside() {
               <li key={poll.id}>
                 <Link href="/plans" className="block rounded-2xl bg-elevated p-3 transition hover:bg-raised">
                   <p className="text-xs text-muted">
-                    {circle?.emoji} {circle?.name} · {poll.whenLabel}
+                    {[circle && `${circle.emoji} ${circle.name}`, poll.whenLabel].filter(Boolean).join(" · ")}
                   </p>
                   <p className="mt-1 text-sm font-semibold leading-snug">{poll.question}</p>
                   <p className="mt-2 text-xs text-muted">
-                    Leading: {PLAN_CATEGORIES[leader.category].emoji} {leader.label}
-                    {total > 0 && ` · ${Math.round((optionVotes(poll, leader) / total) * 100)}%`}
+                    {total > 0
+                      ? `Leading: ${PLAN_CATEGORIES[leader.category].emoji} ${leader.label} · ${Math.round((optionVotes(poll, leader) / total) * 100)}%`
+                      : `No votes yet · ${poll.deadlineLabel.toLowerCase()}`}
                   </p>
                 </Link>
               </li>

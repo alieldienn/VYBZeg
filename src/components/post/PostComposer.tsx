@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type Rea
 import { ImagePlus, Loader2, MapPin, Send, Trash2, Type, UsersRound } from "lucide-react";
 import { PostCard } from "@/components/feed/PostCard";
 import { Button, buttonStyles } from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DemoNotice";
+import { Tag } from "@/components/ui/Tag";
 import { Segmented } from "@/components/ui/Segmented";
 import { LIMITS, THEME_GRADIENTS, THEME_LABELS } from "@/lib/constants";
 import { cairoDay } from "@/lib/dates";

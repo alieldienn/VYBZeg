@@ -1,17 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Check, Clock, Lock, PartyPopper } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { CalendarDays, Check, Clock, Loader2, Lock, PartyPopper, Trash2 } from "lucide-react";
 import { Avatar, AvatarStack } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { PLAN_CATEGORIES } from "@/lib/constants";
+import { deletePoll, lockPoll, setVote } from "@/lib/polls";
 import { useVybz } from "@/lib/store";
+import type { Result } from "@/lib/supabase/errors";
 import type { Poll, User } from "@/lib/types";
 import { cn, leadingOption, optionVotes, pluralize, totalVotes } from "@/lib/utils";
 
+type PollCardProps = {
+  poll: Poll;
+  showCircle?: boolean;
+  /** Called with the updated plan (instantly when you vote, and again to undo if saving fails). */
+  onChange: (poll: Poll) => void;
+};
+
 /** A plan poll. Tap an option to vote; tap it again to take your vote back. */
-export function PollCard({ poll, showCircle = true }: { poll: Poll; showCircle?: boolean }) {
-  const { vote, closePoll, showToast, getUser, getCircle, me } = useVybz();
+export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
+  const router = useRouter();
+  const { showToast, getUser, getCircle, me, pollsChanged } = useVybz();
+  const [voting, setVoting] = useState(false);
+  const [locking, setLocking] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const circle = getCircle(poll.circleId);
   const creator = getUser(poll.creatorId);
   const total = totalVotes(poll);
@@ -19,16 +35,46 @@ export function PollCard({ poll, showCircle = true }: { poll: Poll; showCircle?:
   const showResults = decided || poll.myVote !== null;
   const leader = leadingOption(poll);
   const isMine = poll.creatorId === me.id;
+  const myRole = circle?.roles?.[me.id];
+  const canDelete = isMine || myRole === "owner" || myRole === "admin";
 
-  function handleVote(optionId: string) {
-    const removing = poll.myVote === optionId;
-    vote(poll.id, optionId);
-    if (!removing) showToast("Vote counted");
+  /** Shows an error (sending you to log in if needed). Returns true if there was one. */
+  function failed(result: Result) {
+    if (!result.error) return false;
+    showToast(result.error, "error");
+    if (result.expired) router.push("/login");
+    return true;
   }
 
-  function handleClose() {
-    closePoll(poll.id);
+  async function handleVote(optionId: string) {
+    if (voting || decided) return;
+    const before = poll;
+    const next = poll.myVote === optionId ? null : optionId;
+    onChange({ ...poll, myVote: next }); // Show it right away…
+    setVoting(true);
+    const result = await setVote(poll.id, before.myVote, next);
+    setVoting(false);
+    if (failed(result)) {
+      onChange(before); // …and undo it if saving failed.
+      pollsChanged(); // The plan may have closed meanwhile: reload to show that.
+    } else if (next) {
+      showToast("Vote counted");
+    }
+  }
+
+  async function handleLock() {
+    setLocking(true);
+    const result = await lockPoll(poll.id);
+    setLocking(false);
+    if (failed(result)) return;
     showToast(`Plan locked: ${leader.label}`);
+    pollsChanged();
+  }
+
+  async function handleDelete() {
+    if (failed(await deletePoll(poll.id))) return false;
+    showToast("Plan deleted");
+    pollsChanged();
   }
 
   return (
@@ -36,20 +82,14 @@ export function PollCard({ poll, showCircle = true }: { poll: Poll; showCircle?:
       <header className="flex items-center gap-2.5">
         {creator && <Avatar user={creator} size="sm" />}
         <p className="min-w-0 flex-1 truncate text-xs text-muted">
-          <span className="font-semibold text-fg">{isMine ? "You" : creator?.name.split(" ")[0]}</span> asked
+          <span className="font-semibold text-fg">{isMine ? "You" : (creator?.name.split(" ")[0] ?? "Someone")}</span> asked
           {showCircle && circle && (
             <>
               {" "}
               in{" "}
-              {circle.sample ? (
-                <span className="font-medium text-fg">
-                  {circle.emoji} {circle.name}
-                </span>
-              ) : (
-                <Link href={`/circles/${circle.id}`} className="font-medium text-fg hover:underline">
-                  {circle.emoji} {circle.name}
-                </Link>
-              )}
+              <Link href={`/circles/${circle.id}`} className="font-medium text-fg hover:underline">
+                {circle.emoji} {circle.name}
+              </Link>
             </>
           )}
         </p>
@@ -65,17 +105,19 @@ export function PollCard({ poll, showCircle = true }: { poll: Poll; showCircle?:
       </header>
 
       <h3 className="mt-3 font-display text-xl font-semibold leading-snug">{poll.question}</h3>
-      <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-        <CalendarDays className="h-3.5 w-3.5" aria-hidden />
-        {poll.whenLabel}
-      </p>
+      {poll.whenLabel && (
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+          <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+          {poll.whenLabel}
+        </p>
+      )}
 
       <ul className="mt-4 space-y-2">
         {poll.options.map((option) => {
           const votes = optionVotes(poll, option);
           const percent = total ? Math.round((votes / total) * 100) : 0;
           const mine = poll.myVote === option.id;
-          const winner = decided && option.id === leader.id;
+          const winner = decided && total > 0 && option.id === leader.id;
           const voters = [...option.voterIds.map(getUser), ...(mine ? [me] : [])].filter((u): u is User => Boolean(u));
           const category = PLAN_CATEGORIES[option.category];
           return (
@@ -84,6 +126,7 @@ export function PollCard({ poll, showCircle = true }: { poll: Poll; showCircle?:
                 type="button"
                 disabled={decided}
                 aria-pressed={mine}
+                aria-busy={voting}
                 onClick={() => handleVote(option.id)}
                 className={cn(
                   "relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border p-2.5 text-left transition-all duration-200",
@@ -128,24 +171,48 @@ export function PollCard({ poll, showCircle = true }: { poll: Poll; showCircle?:
       </ul>
 
       <footer className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-        {decided ? (
-          <p className="flex items-center gap-1.5 font-semibold text-success">
-            <PartyPopper className="h-4 w-4" aria-hidden />
-            Plan locked: {leader.label}
-          </p>
-        ) : (
+        {!decided ? (
           <p>
             {pluralize(total, "vote")}
             {poll.myVote ? " · tap your pick again to undo" : " · tap an option to vote"}
           </p>
+        ) : total === 0 ? (
+          <p>Voting closed with no votes.</p>
+        ) : (
+          <p className="flex items-center gap-1.5 font-semibold text-success">
+            <PartyPopper className="h-4 w-4" aria-hidden />
+            {poll.lockedIn ? "Plan locked" : "Voting closed"}: {leader.label}
+          </p>
         )}
-        {isMine && !decided && (
-          <Button size="sm" variant="secondary" onClick={handleClose} disabled={total === 0}>
-            <Lock className="h-3.5 w-3.5" />
-            Lock in plan
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="rounded-full p-2 text-subtle transition hover:bg-white/5 hover:text-danger"
+              aria-label="Delete plan"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+          {isMine && !decided && (
+            <Button size="sm" variant="secondary" onClick={handleLock} disabled={total === 0 || locking}>
+              {locking ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Lock className="h-3.5 w-3.5" />}
+              Lock in plan
+            </Button>
+          )}
+        </div>
       </footer>
+
+      <ConfirmSheet
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        title="Delete this plan?"
+        description={`"${poll.question}" and all its votes will be removed for everyone in the circle.`}
+        confirmLabel="Delete plan"
+        danger
+        onConfirm={handleDelete}
+      />
     </article>
   );
 }

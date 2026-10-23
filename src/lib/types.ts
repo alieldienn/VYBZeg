@@ -10,7 +10,7 @@ export type User = {
   username: string;
   /** Hue (0-360) used to colour the generated avatar. */
   avatarHue: number;
-  /** Optional real photo. Sample users use generated initials instead. */
+  /** Profile photo, if they added one. Otherwise their initials are shown. */
   avatarUrl?: string;
   bio?: string;
   area?: string;
@@ -93,8 +93,6 @@ export type Circle = {
   roles?: Record<string, CircleRole>;
   /** Pending invites, so the right people can cancel them (real circles only). */
   invites?: { id: string; inviteeId: string; inviterId: string }[];
-  /** True for leftover sample circles used by the sample feed and plans. */
-  sample?: boolean;
 };
 
 /** An invitation for the logged-in user to join a circle. */
@@ -139,11 +137,18 @@ export type Poll = {
   circleId: string;
   creatorId: string;
   question: string;
+  /** Free text like "This weekend". Can be empty. */
   whenLabel: string;
+  /** When it was created (ISO time). */
+  createdAt: string;
+  /** "Closes in 5h", "Locked in" or "Closed". */
   deadlineLabel: string;
   options: PollOption[];
   myVote: string | null;
+  /** "decided" once it's locked in or its voting time has run out. */
   status: "open" | "decided";
+  /** True when its creator locked it in (rather than time running out). */
+  lockedIn: boolean;
 };
 
 export type ReminderTime = "morning" | "afternoon" | "evening" | "surprise";

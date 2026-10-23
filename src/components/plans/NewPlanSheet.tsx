@@ -1,13 +1,16 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { Plus, X } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { LIMITS, PLAN_CATEGORIES, PLAN_SUGGESTIONS } from "@/lib/constants";
+import { createPoll } from "@/lib/polls";
 import { useVybz } from "@/lib/store";
 import type { PlanCategory } from "@/lib/types";
-import { cn, newId } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 type DraftOption = { label: string; category: PlanCategory; detail?: string };
 
@@ -22,15 +25,19 @@ export function NewPlanSheet({
   onClose: () => void;
   defaultCircleId?: string;
 }) {
-  const { me, circles, addPoll, showToast } = useVybz();
+  const router = useRouter();
+  const { circles, social, showToast, pollsChanged } = useVybz();
   const [question, setQuestion] = useState("");
-  const [circleId, setCircleId] = useState(defaultCircleId ?? circles[0]?.id ?? "");
+  const [pickedCircleId, setCircleId] = useState(defaultCircleId ?? "");
   const [when, setWhen] = useState(WHEN_CHOICES[2]);
   const [options, setOptions] = useState<DraftOption[]>([]);
   const [custom, setCustom] = useState("");
+  const [saving, setSaving] = useState(false);
 
+  // Circles load after the page opens, so fall back to the first one once they arrive.
+  const circleId = circles.some((c) => c.id === pickedCircleId) ? pickedCircleId : (circles[0]?.id ?? "");
   const full = options.length >= LIMITS.maxPollOptions;
-  const canCreate = question.trim().length > 0 && options.length >= 2 && Boolean(circleId);
+  const canCreate = question.trim().length > 0 && options.length >= 2 && Boolean(circleId) && !saving;
 
   function addOption(option: DraftOption) {
     if (full || options.some((o) => o.label.toLowerCase() === option.label.toLowerCase())) return;
@@ -51,33 +58,42 @@ export function NewPlanSheet({
     setWhen(WHEN_CHOICES[2]);
   }
 
-  function create() {
+  async function create() {
     if (!canCreate) return;
-    addPoll({
-      id: newId("poll"),
-      circleId,
-      creatorId: me.id,
-      question: question.trim(),
-      whenLabel: when,
-      deadlineLabel: "Closes in 24h",
-      status: "open",
-      myVote: null,
-      options: options.map((option) => ({ ...option, id: newId("opt"), voterIds: [] })),
-    });
-    showToast("Plan created. Time to vote!");
+    setSaving(true);
+    const result = await createPoll({ circleId, question, whenLabel: when, options });
+    setSaving(false);
+    if (result.error) {
+      showToast(result.error, "error");
+      if (result.expired) router.push("/login");
+      return;
+    }
+    showToast("Plan created. Voting is open for 24 hours!");
+    pollsChanged();
     reset();
     onClose();
   }
 
+  const noCircles = social.status === "ready" && circles.length === 0;
+
   return (
     <Sheet
       open={open}
-      onClose={onClose}
+      onClose={saving ? () => {} : onClose}
       title="New plan"
       description="Ask your circle and let everyone vote."
       footer={
         <Button size="lg" className="w-full" disabled={!canCreate} onClick={create}>
-          {canCreate ? "Create plan" : options.length < 2 ? "Add at least 2 options" : "Add a question"}
+          {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+          {saving
+            ? "Creating…"
+            : canCreate
+              ? "Create plan"
+              : !question.trim()
+                ? "Add a question"
+                : options.length < 2
+                  ? "Add at least 2 options"
+                  : "Pick a circle"}
         </Button>
       }
     >
@@ -94,13 +110,25 @@ export function NewPlanSheet({
 
         <div>
           <p className="mb-2 text-sm font-medium">Circle</p>
-          <div className="flex flex-wrap gap-2">
-            {circles.map((circle) => (
-              <Chip key={circle.id} active={circleId === circle.id} onClick={() => setCircleId(circle.id)}>
-                {circle.emoji} {circle.name}
-              </Chip>
-            ))}
-          </div>
+          {noCircles ? (
+            <p className="text-sm text-muted">
+              Plans happen inside a circle.{" "}
+              <Link href="/circles" className="font-medium text-brand-soft hover:underline">
+                Start a circle
+              </Link>{" "}
+              first, or accept an invite.
+            </p>
+          ) : social.status === "loading" ? (
+            <div className="h-9 w-40 animate-pulse rounded-full bg-elevated" role="status" aria-label="Loading circles" />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {circles.map((circle) => (
+                <Chip key={circle.id} active={circleId === circle.id} onClick={() => setCircleId(circle.id)}>
+                  {circle.emoji} {circle.name}
+                </Chip>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>

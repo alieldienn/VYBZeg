@@ -4,19 +4,18 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { DemoNotice } from "@/components/ui/DemoNotice";
 import { Segmented } from "@/components/ui/Segmented";
-import { useVybz } from "@/lib/store";
+import { usePolls } from "@/lib/hooks/usePolls";
 import { NewPlanSheet } from "./NewPlanSheet";
 import { PollCard } from "./PollCard";
 
 export function PlansView() {
-  const { polls } = useVybz();
+  const plans = usePolls();
   const [tab, setTab] = useState<"open" | "decided">("open");
   const [creating, setCreating] = useState(false);
 
-  const open = polls.filter((poll) => poll.status === "open");
-  const decided = polls.filter((poll) => poll.status === "decided");
+  const open = plans.polls.filter((poll) => poll.status === "open");
+  const decided = plans.polls.filter((poll) => poll.status === "decided");
   const shown = tab === "open" ? open : decided;
 
   return (
@@ -33,8 +32,6 @@ export function PlansView() {
       />
 
       <div className="space-y-5">
-        <DemoNotice>Friends&apos; votes are sample data. Your votes and new plans live on this device until you refresh.</DemoNotice>
-
         <Segmented
           label="Plan status"
           className="sm:max-w-xs"
@@ -46,10 +43,22 @@ export function PlansView() {
           ]}
         />
 
-        {shown.length > 0 ? (
+        {plans.status === "loading" ? (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2" role="status" aria-label="Loading plans">
+            <div className="h-72 animate-pulse rounded-[28px] bg-surface" />
+            <div className="hidden h-72 animate-pulse rounded-[28px] bg-surface lg:block" />
+          </div>
+        ) : plans.status === "error" ? (
+          <div className="rounded-[28px] border border-danger/30 bg-danger/[0.06] px-6 py-8 text-center" role="alert">
+            <p className="text-sm text-muted">{plans.error}</p>
+            <Button variant="secondary" size="sm" className="mt-3" onClick={plans.retry}>
+              Try again
+            </Button>
+          </div>
+        ) : shown.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {shown.map((poll) => (
-              <PollCard key={poll.id} poll={poll} />
+              <PollCard key={poll.id} poll={poll} onChange={plans.updatePoll} />
             ))}
           </div>
         ) : (

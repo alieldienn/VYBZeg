@@ -1,26 +1,23 @@
 "use client";
 
 /*
- * App-wide state shared by every screen.
- * Milestone 2 is moving this to Supabase one feature at a time:
- *  - Your profile is REAL: loaded on the server; edits are saved to Supabase first.
- *  - Friends, friend requests, circles and circle invites are REAL: loaded from
+ * App-wide state shared by every screen. Everything here comes from Supabase:
+ *  - Your profile: loaded on the server; edits are saved to Supabase first.
+ *  - Friends, friend requests, circles and circle invites: loaded from
  *    Supabase in the browser (Row Level Security decides what you can see) and
  *    reloaded after every change.
+ *  - Posts and plans are not kept here: each screen loads its own list (see
+ *    usePosts and usePolls). `postsVersion` / `pollsVersion` tell those lists
+ *    to reload after something changes.
+ *  - `users` remembers every profile seen so far, so any screen can show a name.
  *  - "Reduce motion" is remembered on this device (localStorage).
- *  - Posts, reactions and comments are REAL, but not kept here: each screen
- *    loads its own list (see usePosts). `postsVersion` tells those lists to
- *    reload after you post something.
- *  - Polls are still SAMPLE data held in memory (refreshing resets them) until
- *    Stage 7. The sample "me" has been swapped for your real account, and the
- *    sample circles they mention are kept only to label those polls.
  */
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
-import { CURRENT_USER_ID, DEFAULT_SETTINGS, SAMPLE_CIRCLES, SAMPLE_POLLS, SAMPLE_USERS } from "./sample-data";
+import { DEFAULT_SETTINGS } from "./constants";
 import { fetchSocial, type SocialData } from "./social";
 import type { Result } from "./supabase/errors";
-import type { Circle, CircleInvite, FriendRequest, Poll, Settings, User } from "./types";
+import type { Circle, CircleInvite, FriendRequest, Settings, User } from "./types";
 
 export type ToastTone = "success" | "error";
 
@@ -30,11 +27,9 @@ type State = {
   users: User[];
   /** Goes up by one whenever posts change, so lists know to reload. */
   postsVersion: number;
-  /** Your real circles. */
+  /** Same for plans (polls and votes). */
+  pollsVersion: number;
   circles: Circle[];
-  /** Sample circles, only for labelling sample posts and polls. */
-  sampleCircles: Circle[];
-  polls: Poll[];
   friendIds: string[];
   requests: FriendRequest[];
   invites: CircleInvite[];
@@ -46,10 +41,8 @@ type State = {
 
 type Action =
   | { type: "postsChanged" }
+  | { type: "pollsChanged" }
   | { type: "mergeUsers"; users: User[] }
-  | { type: "vote"; pollId: string; optionId: string }
-  | { type: "addPoll"; poll: Poll }
-  | { type: "closePoll"; pollId: string }
   | { type: "socialLoaded"; data: SocialData }
   | { type: "socialFailed"; error: string }
   | { type: "updateProfile"; userId: string; changes: Partial<Pick<User, "name" | "username" | "bio" | "area" | "avatarUrl">> }
@@ -61,6 +54,8 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "postsChanged":
       return { ...state, postsVersion: state.postsVersion + 1 };
+    case "pollsChanged":
+      return { ...state, pollsVersion: state.pollsVersion + 1 };
     case "mergeUsers": {
       if (!action.users.length) return state;
       // Newer copies replace older ones (profile edits are saved to Supabase first, so this is safe).
@@ -74,24 +69,6 @@ function reducer(state: State, action: Action): State {
         ],
       };
     }
-    case "vote":
-      return {
-        ...state,
-        polls: state.polls.map((poll) =>
-          poll.id === action.pollId && poll.status === "open"
-            ? { ...poll, myVote: poll.myVote === action.optionId ? null : action.optionId }
-            : poll,
-        ),
-      };
-    case "addPoll":
-      return { ...state, polls: [action.poll, ...state.polls] };
-    case "closePoll":
-      return {
-        ...state,
-        polls: state.polls.map((poll) =>
-          poll.id === action.pollId ? { ...poll, status: "decided", deadlineLabel: "Closed" } : poll,
-        ),
-      };
     case "socialLoaded": {
       const fresh = new Set(action.data.users.map((user) => user.id));
       return {
@@ -121,24 +98,13 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-/** Starting state: sample posts/polls with the sample "me" replaced by your real account. */
+/** Starting state: just your own profile until friends and circles load. */
 function initialState({ me }: { me: User }): State {
-  const swap = (id: string) => (id === CURRENT_USER_ID ? me.id : id);
   return {
-    users: SAMPLE_USERS.map((user) => (user.id === CURRENT_USER_ID ? me : user)),
+    users: [me],
     postsVersion: 0,
-    polls: SAMPLE_POLLS.map((poll) => ({
-      ...poll,
-      creatorId: swap(poll.creatorId),
-      options: poll.options.map((option) => ({ ...option, voterIds: option.voterIds.map(swap) })),
-    })),
+    pollsVersion: 0,
     circles: [],
-    sampleCircles: SAMPLE_CIRCLES.map((circle) => ({
-      ...circle,
-      sample: true,
-      memberIds: circle.memberIds.map(swap),
-      activity: circle.activity.map((item) => ({ ...item, userId: swap(item.userId) })),
-    })),
     friendIds: [],
     requests: [],
     invites: [],
@@ -157,7 +123,7 @@ type VybzContextValue = State & {
   /** Your accepted friends. */
   friends: User[];
   getUser: (id: string) => User | undefined;
-  /** Finds one of your circles (or a sample circle mentioned by sample posts/polls). */
+  /** Finds one of your circles. */
   getCircle: (id: string) => Circle | undefined;
   /** Reloads friends, requests, circles and invites from Supabase. */
   reloadSocial: () => Promise<void>;
@@ -168,11 +134,10 @@ type VybzContextValue = State & {
   runSocial: (change: Promise<Result>, success?: string) => Promise<boolean>;
   /** Tell every post list to reload (after posting or deleting). */
   postsChanged: () => void;
-  /** Remember profiles that came back with posts or comments (authors). */
+  /** Tell every plan list to reload (after creating, locking in or deleting a plan). */
+  pollsChanged: () => void;
+  /** Remember profiles that came back with posts, comments or plans. */
   mergeUsers: (users: User[]) => void;
-  vote: (pollId: string, optionId: string) => void;
-  addPoll: (poll: Poll) => void;
-  closePoll: (pollId: string) => void;
   updateProfile: (changes: Extract<Action, { type: "updateProfile" }>["changes"]) => void;
   updateSettings: (changes: Partial<Settings>) => void;
   showToast: (message: string, tone?: ToastTone) => void;
@@ -193,6 +158,7 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
   );
 
   const postsChanged = useCallback(() => dispatch({ type: "postsChanged" }), []);
+  const pollsChanged = useCallback(() => dispatch({ type: "pollsChanged" }), []);
   const mergeUsers = useCallback((users: User[]) => dispatch({ type: "mergeUsers", users }), []);
 
   const reloadSocial = useCallback(async () => {
@@ -253,11 +219,7 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
   }, [state.settings.reduceMotion]);
 
   const getUser = useCallback((id: string) => state.users.find((user) => user.id === id), [state.users]);
-  const getCircle = useCallback(
-    (id: string) =>
-      state.circles.find((circle) => circle.id === id) ?? state.sampleCircles.find((circle) => circle.id === id),
-    [state.circles, state.sampleCircles],
-  );
+  const getCircle = useCallback((id: string) => state.circles.find((circle) => circle.id === id), [state.circles]);
 
   const value = useMemo<VybzContextValue>(() => {
     return {
@@ -271,15 +233,13 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
       reloadSocial,
       runSocial,
       postsChanged,
+      pollsChanged,
       mergeUsers,
-      vote: (pollId, optionId) => dispatch({ type: "vote", pollId, optionId }),
-      addPoll: (poll) => dispatch({ type: "addPoll", poll }),
-      closePoll: (pollId) => dispatch({ type: "closePoll", pollId }),
       updateProfile: (changes) => dispatch({ type: "updateProfile", userId, changes }),
       updateSettings: (changes) => dispatch({ type: "updateSettings", changes }),
       showToast,
     };
-  }, [state, me, userId, email, getUser, getCircle, reloadSocial, runSocial, showToast, postsChanged, mergeUsers]);
+  }, [state, me, userId, email, getUser, getCircle, reloadSocial, runSocial, showToast, postsChanged, pollsChanged, mergeUsers]);
 
   return <VybzContext.Provider value={value}>{children}</VybzContext.Provider>;
 }

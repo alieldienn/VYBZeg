@@ -6,7 +6,7 @@ import { CirclePlus } from "lucide-react";
 import { Logo, TAGLINE } from "@/components/brand/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { buttonStyles } from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DemoNotice";
+import { Tag } from "@/components/ui/Tag";
 import { useVybz } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS, isActive } from "./nav-items";
@@ -63,7 +63,7 @@ export function SidebarPanel({ pathname }: { pathname: string | null }) {
       <div className="mt-auto space-y-3">
         <div className="rounded-2xl border border-line bg-surface p-3.5 text-xs leading-relaxed text-muted">
           <Tag>Beta</Tag>
-          <p className="mt-2">Everything is real except Plans, which still shows sample data for now.</p>
+          <p className="mt-2">VYBZ is in beta. Notifications, the Weekly Recap and Arabic are coming soon.</p>
         </div>
         <Link
           href="/profile"

@@ -1,4 +1,4 @@
-import type { PlanCategory, ReactionKey, ReminderTime, ThemeColor } from "./types";
+import type { PlanCategory, ReactionKey, ReminderTime, Settings, ThemeColor } from "./types";
 
 export const REACTIONS: { key: ReactionKey; emoji: string; label: string }[] = [
   { key: "fire", emoji: "🔥", label: "Fire" },
@@ -67,3 +67,15 @@ export const LIMITS = {
   maxPollOptions: 6,
   maxImageMB: 10,
 } as const;
+
+/** Settings everyone starts with. (Only "Reduce motion" can be changed so far.) */
+export const DEFAULT_SETTINGS: Settings = {
+  dailyReminder: true,
+  reminderTime: "surprise",
+  notifyReactions: true,
+  notifyPlans: true,
+  notifyCircles: false,
+  privateProfile: true,
+  showActivity: true,
+  reduceMotion: false,
+};

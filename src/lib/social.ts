@@ -51,16 +51,28 @@ export async function fetchSocial(userId: string): Promise<Result<{ data?: Socia
     : { data: [], error: null };
   if (circleRows.error) return failure(circleRows.error, "We couldn't load your circles.");
 
-  // Recent posts (just who/where/when) for "new today", streaks and activity.
-  const recentPosts = circleIds.length
-    ? await supabase
-        .from("posts")
-        .select("circle_id, author_id, created_at")
-        .gte("created_at", daysAgoIso(STATS_DAYS))
-        .order("created_at", { ascending: false })
-        .limit(2000)
-    : { data: [], error: null };
-  if (recentPosts.error) return failure(recentPosts.error, "We couldn't load your circles.");
+  // Recent posts and plans (just who/where/when) for "new today", streaks and activity.
+  const [recentPosts, recentPlans] = circleIds.length
+    ? await Promise.all([
+        supabase
+          .from("posts")
+          .select("circle_id, author_id, created_at")
+          .gte("created_at", daysAgoIso(STATS_DAYS))
+          .order("created_at", { ascending: false })
+          .limit(2000),
+        supabase
+          .from("polls")
+          .select("circle_id, creator_id, created_at")
+          .gte("created_at", daysAgoIso(STATS_DAYS))
+          .order("created_at", { ascending: false })
+          .limit(500),
+      ])
+    : [
+        { data: [], error: null },
+        { data: [], error: null },
+      ];
+  const recentError = recentPosts.error ?? recentPlans.error;
+  if (recentError) return failure(recentError, "We couldn't load your circles.");
 
   // Friends and requests. A request the other person declined still looks
   // "sent" to you, so declining isn't announced to the sender.
@@ -76,7 +88,12 @@ export async function fetchSocial(userId: string): Promise<Result<{ data?: Socia
 
   const today = cairoDay();
   const circles = (circleRows.data ?? []).map((row) =>
-    toCircle(row, (recentPosts.data ?? []).filter((post) => post.circle_id === row.id), today),
+    toCircle(
+      row,
+      (recentPosts.data ?? []).filter((post) => post.circle_id === row.id),
+      (recentPlans.data ?? []).filter((plan) => plan.circle_id === row.id),
+      today,
+    ),
   );
   const circleInvites: CircleInvite[] = (invites.data ?? [])
     .filter((invite) => invite.circles)
@@ -121,17 +138,25 @@ type CircleRow = {
 
 const ROLE_ORDER: Record<CircleRole, number> = { owner: 0, admin: 1, member: 2 };
 
-/** Posts from the last few weeks only feed the stats; older posts don't affect them. */
+/** Posts and plans from the last few weeks only feed the stats; older ones don't affect them. */
 const STATS_DAYS = 35;
 
 type RecentPost = { circle_id: string; author_id: string; created_at: string };
+type RecentPlan = { circle_id: string; creator_id: string; created_at: string };
 
-function toCircle(row: CircleRow, posts: RecentPost[], today: string): Circle {
+function toCircle(row: CircleRow, posts: RecentPost[], plans: RecentPlan[], today: string): Circle {
   const members = [...row.circle_members].sort(
     (a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.joined_at.localeCompare(b.joined_at),
   );
-  // Activity: who created/joined the circle, plus the latest posts (newest first).
+  // Activity: who created/joined the circle, plus the latest posts and plans (newest first).
   const events = [
+    ...plans.slice(0, 5).map((p, index) => ({
+      id: `plan-${index}-${p.created_at}`,
+      userId: p.creator_id,
+      kind: "plan" as const,
+      text: "started a plan",
+      at: p.created_at,
+    })),
     ...row.circle_members.map((m) => ({
       id: `join-${m.user_id}`,
       userId: m.user_id,

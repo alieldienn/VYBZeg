@@ -14,11 +14,6 @@ export function initials(name: string) {
     .join("");
 }
 
-/** Creates a unique id. Only call this inside event handlers, never while rendering. */
-export function newId(prefix: string) {
-  return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
-}
-
 export function reactionCount(post: Post, key: ReactionKey) {
   return post.reactions[key] + (post.myReaction === key ? 1 : 0);
 }
@@ -42,7 +37,7 @@ export function leadingOption(poll: Poll) {
   );
 }
 
-/** Short "time ago" label like the sample data uses: "now", "5m", "3h", "2d", "4w". */
+/** Short "time ago" label: "now", "5m", "3h", "2d", "4w". */
 export function timeAgo(iso: string, now = Date.now()) {
   const minutes = Math.floor((now - new Date(iso).getTime()) / 60000);
   if (minutes < 1) return "now";

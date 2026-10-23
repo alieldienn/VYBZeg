@@ -9,7 +9,7 @@ import { Bell, Camera, Flame, Globe2, Loader2, LogOut, MapPin, Palette, PenLine,
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, buttonStyles } from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DemoNotice";
+import { Tag } from "@/components/ui/Tag";
 import { Segmented } from "@/components/ui/Segmented";
 import { Switch } from "@/components/ui/Switch";
 import { signOut } from "@/lib/auth/actions";
