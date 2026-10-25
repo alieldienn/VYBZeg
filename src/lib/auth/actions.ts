@@ -102,6 +102,12 @@ export async function signup(_prev: FormState, formData: FormData): Promise<Form
   });
   if (error) return { error: friendlyAuthError(error), values };
 
+  // Supabase answers "success" for an email that already has a confirmed
+  // account, but sends nothing. Such a reply has no identities.
+  if (data.user && data.user.identities?.length === 0) {
+    return { error: "An account with this email already exists. Try logging in.", field: "email", values };
+  }
+
   // Email confirmation turned off in Supabase: the user is logged in already.
   if (data.session) {
     revalidatePath("/", "layout");
