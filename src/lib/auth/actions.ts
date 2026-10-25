@@ -53,6 +53,7 @@ function friendlyAuthError(error: AuthError): string {
     case "same_password":
       return "Your new password must be different from the old one.";
     case "over_email_send_rate_limit":
+      return "We've sent too many emails in the last hour. Please try again in about an hour.";
     case "over_request_rate_limit":
       return "Too many attempts. Please wait a few minutes and try again.";
     case "email_address_not_authorized":
