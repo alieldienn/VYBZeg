@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { Loader2, RefreshCw, Send, X } from "lucide-react";
+import { Flag, Loader2, RefreshCw, Send, X } from "lucide-react";
+import { SafetySheet } from "@/components/safety/SafetySheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { addComment, deleteComment, fetchComments } from "@/lib/posts";
 import { useVybz } from "@/lib/store";
@@ -23,6 +24,10 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // The comment being reported (or whose author is being blocked).
+  const [safetyFor, setSafetyFor] = useState<Comment | null>(null);
+  const [safetyKey, setSafetyKey] = useState(0);
+  const safetyAuthor = safetyFor ? getUser(safetyFor.authorId) : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +105,19 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
                   <span className="whitespace-pre-line wrap-anywhere text-fg/90">{comment.text}</span>
                   <span className="block text-[11px] text-subtle">{agoText(timeAgo(comment.createdAt))}</span>
                 </div>
+                {author && comment.authorId !== me.id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSafetyKey((n) => n + 1);
+                      setSafetyFor(comment);
+                    }}
+                    className="self-start rounded-full p-1 text-subtle transition hover:bg-tint/5 hover:text-fg"
+                    aria-label={`Report or block ${author.name}`}
+                  >
+                    <Flag className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 {canDelete && (
                   <button
                     type="button"
@@ -137,6 +155,21 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </button>
       </form>
+
+      {safetyAuthor && safetyFor && (
+        <SafetySheet
+          key={safetyKey}
+          open
+          onClose={() => setSafetyFor(null)}
+          user={safetyAuthor}
+          content={{ target: { kind: "comment", commentId: safetyFor.id }, label: "this comment" }}
+          onBlocked={(userId) => {
+            const comments = state.comments.filter((c) => c.authorId !== userId);
+            setState({ status: "ready", comments });
+            onCountChange(comments.length);
+          }}
+        />
+      )}
     </div>
   );
 }

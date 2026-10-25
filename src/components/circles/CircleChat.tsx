@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { Loader2, MessagesSquare, RefreshCw, Send, Trash2 } from "lucide-react";
+import { Flag, Loader2, MessagesSquare, RefreshCw, Send, Trash2 } from "lucide-react";
+import { SafetySheet } from "@/components/safety/SafetySheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { deleteMessage, fetchMessages, MESSAGE_MAX, sendMessage, subscribeToMessages, type ChatMessage } from "@/lib/chat";
@@ -38,6 +39,10 @@ export function CircleChat({ circle }: { circle: Circle }) {
   const [sending, setSending] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // The message being reported (or whose sender is being blocked).
+  const [safetyFor, setSafetyFor] = useState<ChatMessage | null>(null);
+  const [safetyKey, setSafetyKey] = useState(0);
+  const safetyAuthor = safetyFor ? getUser(safetyFor.authorId) : undefined;
   const list = useRef<HTMLDivElement>(null);
   // Stay at the bottom when new messages arrive, unless you scrolled up to read.
   const stickToBottom = useRef(true);
@@ -246,6 +251,19 @@ export function CircleChat({ circle }: { circle: Circle }) {
                               Delete
                             </button>
                           )}
+                          {!mine && author && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSafetyKey((n) => n + 1);
+                                setSafetyFor(message);
+                              }}
+                              className="flex items-center gap-1 rounded-full px-1.5 py-0.5 hover:bg-tint/5 hover:text-fg"
+                            >
+                              <Flag className="h-3 w-3" aria-hidden />
+                              Report
+                            </button>
+                          )}
                         </span>
                       )}
                     </div>
@@ -275,6 +293,19 @@ export function CircleChat({ circle }: { circle: Circle }) {
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </form>
+
+      {safetyFor && safetyAuthor && (
+        <SafetySheet
+          key={safetyKey}
+          open
+          onClose={() => setSafetyFor(null)}
+          user={safetyAuthor}
+          content={{ target: { kind: "message", messageId: safetyFor.id }, label: "this message" }}
+          onBlocked={(userId) =>
+            setChat((current) => ({ ...current, messages: current.messages.filter((m) => m.authorId !== userId) }))
+          }
+        />
+      )}
     </section>
   );
 }

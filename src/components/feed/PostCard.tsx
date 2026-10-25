@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ImageIcon, ImageOff, MapPin, MessageCircle, Trash2, UsersRound } from "lucide-react";
+import { ImageIcon, ImageOff, MapPin, MessageCircle, MoreHorizontal, Trash2, UsersRound } from "lucide-react";
+import { SafetySheet } from "@/components/safety/SafetySheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { THEME_GRADIENTS } from "@/lib/constants";
@@ -33,6 +34,9 @@ export function PostCard({ post, author, preview = false, onChange, onRemove, cl
   const { me, getUser, getCircle, showToast, postsChanged } = useVybz();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [safetyOpen, setSafetyOpen] = useState(false);
+  // A new key each time the report/block sheet opens, so it starts fresh.
+  const [safetyKey, setSafetyKey] = useState(0);
   const user = author ?? getUser(post.authorId);
   const circle = post.circleId ? getCircle(post.circleId) : undefined;
   const canDelete =
@@ -95,6 +99,19 @@ export function PostCard({ post, author, preview = false, onChange, onRemove, cl
             aria-label="Delete this vibe"
           >
             <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+        {!preview && user && post.authorId !== me.id && (
+          <button
+            type="button"
+            onClick={() => {
+              setSafetyKey((n) => n + 1);
+              setSafetyOpen(true);
+            }}
+            className="-mr-1 rounded-full p-2 text-subtle transition hover:bg-tint/5 hover:text-fg"
+            aria-label={`More options for ${user.name}'s vibe`}
+          >
+            <MoreHorizontal className="h-4 w-4" />
           </button>
         )}
       </header>
@@ -179,6 +196,16 @@ export function PostCard({ post, author, preview = false, onChange, onRemove, cl
         {commentsOpen && <Comments post={post} onCountChange={(commentCount) => onChange?.({ ...post, commentCount })} />}
       </footer>
 
+      {!preview && user && post.authorId !== me.id && (
+        <SafetySheet
+          key={safetyKey}
+          open={safetyOpen}
+          onClose={() => setSafetyOpen(false)}
+          user={user}
+          content={{ target: { kind: "post", postId: post.id }, label: "this vibe" }}
+          onBlocked={() => onRemove?.(post.id)}
+        />
+      )}
       {canDelete && (
         <ConfirmSheet
           open={confirmDelete}

@@ -3,6 +3,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Loader2, RefreshCw, UserMinus, UserPlus, X } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SafetyButton } from "@/components/safety/SafetyButton";
+import { SafetySheet } from "@/components/safety/SafetySheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
@@ -17,6 +19,14 @@ export function FriendsView() {
   const { me, friends, requests, getUser, social, reloadSocial, runSocial } = useVybz();
   const [busy, setBusy] = useState<string | null>(null);
   const [removing, setRemoving] = useState<User | null>(null);
+  // The person in the Report / Block sheet. A new key each time starts it fresh.
+  const [safetyFor, setSafetyFor] = useState<User | null>(null);
+  const [safetyKey, setSafetyKey] = useState(0);
+
+  function openSafety(user: User) {
+    setSafetyKey((n) => n + 1);
+    setSafetyFor(user);
+  }
 
   // Fetch fresh requests whenever this screen opens.
   useEffect(() => {
@@ -79,6 +89,7 @@ export function FriendsView() {
                       {busy === key && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
                       Accept
                     </Button>
+                    <SafetyButton user={user} onOpen={openSafety} />
                   </PersonRow>
                 );
               })}
@@ -101,6 +112,7 @@ export function FriendsView() {
                   >
                     <UserMinus className="h-4 w-4" />
                   </button>
+                  <SafetyButton user={user} onOpen={openSafety} />
                 </PersonRow>
               ))
             )}
@@ -140,6 +152,7 @@ export function FriendsView() {
         confirmLabel="Remove friend"
         onConfirm={() => (removing ? runSocial(removeFriendship(me.id, removing.id), "Friend removed") : Promise.resolve(false))}
       />
+      {safetyFor && <SafetySheet key={safetyKey} open onClose={() => setSafetyFor(null)} user={safetyFor} />}
     </div>
   );
 }

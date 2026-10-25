@@ -654,8 +654,10 @@ export type Database = {
           avatar_hue: number
           avatar_path: string | null
           bio: string | null
+          circle_invites_from: string
           created_at: string
           display_name: string
+          friend_requests_from: string
           id: string
           username: string
         }
@@ -664,8 +666,10 @@ export type Database = {
           avatar_hue?: number
           avatar_path?: string | null
           bio?: string | null
+          circle_invites_from?: string
           created_at?: string
           display_name: string
+          friend_requests_from?: string
           id: string
           username: string
         }
@@ -674,12 +678,92 @@ export type Database = {
           avatar_hue?: number
           avatar_path?: string | null
           bio?: string | null
+          circle_invites_from?: string
           created_at?: string
           display_name?: string
+          friend_requests_from?: string
           id?: string
           username?: string
         }
         Relationships: []
+      }
+      reports: {
+        Row: {
+          comment_id: string | null
+          content_snapshot: string | null
+          created_at: string
+          details: string | null
+          id: string
+          kind: string
+          message_id: string | null
+          post_id: string | null
+          reason: string
+          reported_user_id: string | null
+          reporter_id: string
+          status: string
+        }
+        Insert: {
+          comment_id?: string | null
+          content_snapshot?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          kind: string
+          message_id?: string | null
+          post_id?: string | null
+          reason: string
+          reported_user_id?: string | null
+          reporter_id?: string
+          status?: string
+        }
+        Update: {
+          comment_id?: string | null
+          content_snapshot?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          kind?: string
+          message_id?: string | null
+          post_id?: string | null
+          reason?: string
+          reported_user_id?: string | null
+          reporter_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      user_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_blocks_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_blocks_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reactions: {
         Row: {

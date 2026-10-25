@@ -23,6 +23,8 @@ import {
 import { PostCard } from "@/components/feed/PostCard";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { NewPlanSheet } from "@/components/plans/NewPlanSheet";
+import { SafetyButton } from "@/components/safety/SafetyButton";
+import { SafetySheet } from "@/components/safety/SafetySheet";
 import { PollCard } from "@/components/plans/PollCard";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, buttonStyles } from "@/components/ui/Button";
@@ -148,6 +150,9 @@ function MemberView({ circle }: { circle: Circle }) {
   const [editingIcon, setEditingIcon] = useState(false);
   // A new key each time the icon sheet opens, so it starts from the current icon.
   const [iconSheetKey, setIconSheetKey] = useState(0);
+  // The member in the Report / Block sheet. A new key each time starts it fresh.
+  const [safetyFor, setSafetyFor] = useState<User | null>(null);
+  const [safetyKey, setSafetyKey] = useState(0);
   const feed = usePosts({ circleId: circle.id });
   const plans = usePolls({ circleId: circle.id });
 
@@ -361,6 +366,15 @@ function MemberView({ circle }: { circle: Circle }) {
                     </span>
                     {member.id === me.id && <Tag tone="brand">You</Tag>}
                     {role !== "member" && <Tag tone="soon">{ROLE_LABELS[role]}</Tag>}
+                    {member.id !== me.id && (
+                      <SafetyButton
+                        user={member}
+                        onOpen={(user) => {
+                          setSafetyKey((n) => n + 1);
+                          setSafetyFor(user);
+                        }}
+                      />
+                    )}
                     {canRemove(member.id) && (
                       <button
                         type="button"
@@ -440,6 +454,7 @@ function MemberView({ circle }: { circle: Circle }) {
       </div>
 
       <InviteSheet circle={circle} open={inviting} onClose={() => setInviting(false)} />
+      {safetyFor && <SafetySheet key={safetyKey} open onClose={() => setSafetyFor(null)} user={safetyFor} />}
       {isAdmin && (
         <EditCircleIconSheet key={iconSheetKey} circle={circle} open={editingIcon} onClose={() => setEditingIcon(false)} />
       )}

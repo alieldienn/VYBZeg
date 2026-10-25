@@ -243,9 +243,10 @@ export async function sendFriendRequest(userId: string, rawUsername: string): Pr
 
   const inserted = await supabase.from("friendships").insert({ addressee_id: person.id });
   if (inserted.error) {
-    return inserted.error.code === "23505"
-      ? { error: `You and @${username} already have a pending request.` }
-      : failure(inserted.error);
+    if (inserted.error.code === "23505") return { error: `You and @${username} already have a pending request.` };
+    // Their privacy settings (or a block) don't allow a request from you.
+    if (inserted.error.code === "42501") return { error: `@${username} isn't accepting friend requests from you.` };
+    return failure(inserted.error);
   }
   return { message: `Friend request sent to @${username}.` };
 }
@@ -304,7 +305,12 @@ export async function inviteToCircle(circleId: string, inviteeIds: string[]): Pr
   const { error } = await createClient()
     .from("circle_invites")
     .insert(inviteeIds.map((inviteeId) => ({ circle_id: circleId, invitee_id: inviteeId })));
-  if (error?.code === "42501") return { error: "You can only invite your friends who aren't in this circle yet." };
+  if (error?.code === "42501") {
+    return {
+      error:
+        "Couldn't send the invites. You can only invite friends who aren't in this circle yet, and some people choose not to get circle invites.",
+    };
+  }
   if (error?.code === "23505") return { error: "Someone you picked is already invited." };
   return error ? failure(error) : {};
 }

@@ -8,6 +8,7 @@ import { useFormStatus } from "react-dom";
 import { Bell, Camera, Check, ChevronRight, Flame, Globe2, Loader2, LogOut, MapPin, Palette, PenLine, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { InstallRow } from "@/components/pwa/Install";
+import { PrivacySettings } from "./PrivacySettings";
 import { PushSettings } from "./PushSettings";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, buttonStyles } from "@/components/ui/Button";
@@ -219,27 +220,8 @@ export function ProfileView() {
           <PushSettings />
         </SettingsGroup>
 
-        <SettingsGroup icon={<ShieldCheck className="h-4 w-4" />} title="Privacy">
-          <ul className="space-y-3 py-3.5 text-sm leading-relaxed">
-            <li>
-              <span className="font-medium">Your profile</span>
-              <span className="block text-xs text-muted">
-                Only visible to your friends, people in your circles, and people you invite or who invite you.
-              </span>
-            </li>
-            <li>
-              <span className="font-medium">Your vibes</span>
-              <span className="block text-xs text-muted">
-                Only members of the circle you post to can see them. Nothing on VYBZ is public.
-              </span>
-            </li>
-            <li>
-              <span className="font-medium">Finding you</span>
-              <span className="block text-xs text-muted">
-                People can only add you if they type your exact username.
-              </span>
-            </li>
-          </ul>
+        <SettingsGroup icon={<ShieldCheck className="h-4 w-4" />} title="Privacy & safety">
+          <PrivacySettings />
         </SettingsGroup>
 
         <SettingsGroup icon={<Palette className="h-4 w-4" />} title="App">
