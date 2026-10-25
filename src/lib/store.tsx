@@ -15,6 +15,7 @@
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import { DEFAULT_SETTINGS } from "./constants";
+import { countUnread } from "./notifications";
 import { fetchSocial, type SocialData } from "./social";
 import type { Result } from "./supabase/errors";
 import type { Circle, CircleInvite, FriendRequest, Settings, User } from "./types";
@@ -37,6 +38,8 @@ type State = {
   social: { status: "loading" | "ready" | "error"; error?: string };
   settings: Settings;
   toast: Toast | null;
+  /** How many notifications you haven't read (null until loaded). */
+  unreadNotifications: number | null;
 };
 
 type Action =
@@ -48,7 +51,8 @@ type Action =
   | { type: "updateProfile"; userId: string; changes: Partial<Pick<User, "name" | "username" | "bio" | "area" | "avatarUrl">> }
   | { type: "updateSettings"; changes: Partial<Settings> }
   | { type: "toast"; message: string; tone: ToastTone }
-  | { type: "dismissToast"; id: number };
+  | { type: "dismissToast"; id: number }
+  | { type: "unreadLoaded"; count: number };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -95,6 +99,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, toast: { id: (state.toast?.id ?? 0) + 1, message: action.message, tone: action.tone } };
     case "dismissToast":
       return state.toast?.id === action.id ? { ...state, toast: null } : state;
+    case "unreadLoaded":
+      return state.unreadNotifications === action.count ? state : { ...state, unreadNotifications: action.count };
   }
 }
 
@@ -111,6 +117,7 @@ function initialState({ me }: { me: User }): State {
     social: { status: "loading" },
     settings: DEFAULT_SETTINGS,
     toast: null,
+    unreadNotifications: null,
   };
 }
 
@@ -141,6 +148,8 @@ type VybzContextValue = State & {
   updateProfile: (changes: Extract<Action, { type: "updateProfile" }>["changes"]) => void;
   updateSettings: (changes: Partial<Settings>) => void;
   showToast: (message: string, tone?: ToastTone) => void;
+  /** Reloads the unread-notifications count (for the bell). */
+  refreshUnread: () => Promise<void>;
 };
 
 const VybzContext = createContext<VybzContextValue | null>(null);
@@ -192,6 +201,28 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
     void reloadSocial();
   }, [reloadSocial]);
 
+  const refreshUnread = useCallback(async () => {
+    const result = await countUnread();
+    if (result.count !== undefined) dispatch({ type: "unreadLoaded", count: result.count });
+  }, []);
+
+  // Keep the bell's unread count fresh: when the app opens, when you come back
+  // to it, and every minute while it's on screen.
+  useEffect(() => {
+    void refreshUnread();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshUnread();
+    };
+    const timer = setInterval(onVisible, 60_000);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [refreshUnread]);
+
   // Auto-hide the toast after a few seconds.
   useEffect(() => {
     if (!state.toast) return;
@@ -238,8 +269,9 @@ export function VybzProvider({ me, email, children }: { me: User; email: string;
       updateProfile: (changes) => dispatch({ type: "updateProfile", userId, changes }),
       updateSettings: (changes) => dispatch({ type: "updateSettings", changes }),
       showToast,
+      refreshUnread,
     };
-  }, [state, me, userId, email, getUser, getCircle, reloadSocial, runSocial, showToast, postsChanged, pollsChanged, mergeUsers]);
+  }, [state, me, userId, email, getUser, getCircle, reloadSocial, runSocial, showToast, postsChanged, pollsChanged, mergeUsers, refreshUnread]);
 
   return <VybzContext.Provider value={value}>{children}</VybzContext.Provider>;
 }

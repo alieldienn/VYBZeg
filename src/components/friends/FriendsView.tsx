@@ -96,7 +96,7 @@ export function FriendsView() {
                   <button
                     type="button"
                     onClick={() => setRemoving(user)}
-                    className="rounded-full p-2 text-subtle transition hover:bg-white/5 hover:text-danger"
+                    className="rounded-full p-2 text-subtle transition hover:bg-tint/5 hover:text-danger"
                     aria-label={`Remove ${user.name} from friends`}
                   >
                     <UserMinus className="h-4 w-4" />

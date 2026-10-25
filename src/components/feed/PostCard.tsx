@@ -68,14 +68,14 @@ export function PostCard({ post, author, preview = false, onChange, onRemove, cl
         </div>
         {circle &&
           (preview ? (
-            <span className="flex max-w-[45%] items-center gap-1.5 rounded-full border border-line bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-muted">
+            <span className="flex max-w-[45%] items-center gap-1.5 rounded-full border border-line bg-tint/[0.03] px-2.5 py-1 text-xs font-medium text-muted">
               <span aria-hidden>{circle.emoji}</span>
               <span className="truncate">{circle.name}</span>
             </span>
           ) : (
             <Link
               href={`/circles/${circle.id}`}
-              className="flex max-w-[45%] items-center gap-1.5 rounded-full border border-line bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-muted transition hover:text-fg"
+              className="flex max-w-[45%] items-center gap-1.5 rounded-full border border-line bg-tint/[0.03] px-2.5 py-1 text-xs font-medium text-muted transition hover:text-fg"
             >
               <span aria-hidden>{circle.emoji}</span>
               <span className="truncate">{circle.name}</span>
@@ -85,7 +85,7 @@ export function PostCard({ post, author, preview = false, onChange, onRemove, cl
           <button
             type="button"
             onClick={() => setConfirmDelete(true)}
-            className="-mr-1 rounded-full p-2 text-subtle transition hover:bg-white/5 hover:text-danger"
+            className="-mr-1 rounded-full p-2 text-subtle transition hover:bg-tint/5 hover:text-danger"
             aria-label="Delete this vibe"
           >
             <Trash2 className="h-4 w-4" />
@@ -138,13 +138,13 @@ export function PostCard({ post, author, preview = false, onChange, onRemove, cl
             post.background === "lime" ? "text-emerald-950" : "text-white",
           )}
         >
-          <p className="whitespace-pre-line break-words font-display text-2xl font-semibold leading-snug sm:text-[28px]">
+          <p className="whitespace-pre-line wrap-anywhere font-display text-2xl font-semibold leading-snug sm:text-[28px]">
             {post.text || <span className="opacity-60">Your text will appear here…</span>}
           </p>
         </div>
       )}
 
-      {post.kind === "photo" && post.text && <p className="whitespace-pre-line break-words px-1 pt-3 text-[15px] leading-relaxed">{post.text}</p>}
+      {post.kind === "photo" && post.text && <p className="whitespace-pre-line wrap-anywhere px-1 pt-3 text-[15px] leading-relaxed">{post.text}</p>}
       {post.kind === "text" && post.location && (
         <p className="flex items-center gap-1 px-1 pt-2 text-xs text-muted">
           <MapPin className="h-3 w-3" aria-hidden /> {post.location}
@@ -161,7 +161,7 @@ export function PostCard({ post, author, preview = false, onChange, onRemove, cl
               aria-expanded={commentsOpen}
               className={cn(
                 "flex h-9 items-center gap-1.5 rounded-full px-3 text-sm transition",
-                commentsOpen ? "bg-elevated text-fg" : "text-muted hover:bg-white/5 hover:text-fg",
+                commentsOpen ? "bg-elevated text-fg" : "text-muted hover:bg-tint/5 hover:text-fg",
               )}
             >
               <MessageCircle className="h-4 w-4" aria-hidden />

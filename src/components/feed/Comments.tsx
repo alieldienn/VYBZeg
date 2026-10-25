@@ -97,7 +97,7 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
                 )}
                 <div className="min-w-0 flex-1 text-sm leading-snug">
                   <span className="font-semibold">{author?.name ?? "Former member"}</span>{" "}
-                  <span className="whitespace-pre-line break-words text-fg/90">{comment.text}</span>
+                  <span className="whitespace-pre-line wrap-anywhere text-fg/90">{comment.text}</span>
                   <span className="block text-[11px] text-subtle">{agoText(timeAgo(comment.createdAt))}</span>
                 </div>
                 {canDelete && (
@@ -105,7 +105,7 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
                     type="button"
                     onClick={() => remove(comment)}
                     disabled={deleting === comment.id}
-                    className="self-start rounded-full p-1 text-subtle transition hover:bg-white/5 hover:text-danger disabled:opacity-50"
+                    className="self-start rounded-full p-1 text-subtle transition hover:bg-tint/5 hover:text-danger disabled:opacity-50"
                     aria-label="Delete comment"
                   >
                     {deleting === comment.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}

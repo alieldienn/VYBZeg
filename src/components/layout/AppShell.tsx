@@ -15,7 +15,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Suspense fallback={<SidebarPanel pathname={null} />}>
         <Sidebar />
       </Suspense>
-      <main className="min-h-dvh pb-28 lg:pb-12 lg:pl-64">
+      {/* Bottom space on phones = tab bar (4rem) + breathing room + the iPhone home-indicator area. */}
+      <main className="min-h-dvh pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-12 lg:pl-64">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-10">{children}</div>
       </main>
       <Suspense fallback={<BottomNavBar pathname={null} />}>

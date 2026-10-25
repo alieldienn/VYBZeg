@@ -104,7 +104,7 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
         </span>
       </header>
 
-      <h3 className="mt-3 font-display text-xl font-semibold leading-snug">{poll.question}</h3>
+      <h3 className="mt-3 font-display text-xl font-semibold leading-snug wrap-anywhere">{poll.question}</h3>
       {poll.whenLabel && (
         <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
           <CalendarDays className="h-3.5 w-3.5" aria-hidden />
@@ -140,7 +140,7 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
                   aria-hidden
                   className={cn(
                     "absolute inset-y-0 left-0 transition-[width] duration-500 ease-out",
-                    mine || winner ? "bg-brand/25" : "bg-white/[0.08]",
+                    mine || winner ? "bg-brand/25" : "bg-tint/[0.08]",
                   )}
                   style={{ width: showResults ? `${percent}%` : "0%" }}
                 />
@@ -189,7 +189,7 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="rounded-full p-2 text-subtle transition hover:bg-white/5 hover:text-danger"
+              className="rounded-full p-2 text-subtle transition hover:bg-tint/5 hover:text-danger"
               aria-label="Delete plan"
             >
               <Trash2 className="h-4 w-4" />

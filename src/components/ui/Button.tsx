@@ -8,10 +8,10 @@ const VARIANTS: Record<Variant, string> = {
   primary:
     "bg-brand-gradient text-white shadow-[0_8px_30px_-8px_rgb(139_92_246/0.6)] hover:brightness-110 active:brightness-95",
   secondary: "bg-elevated text-fg border border-line hover:bg-raised hover:border-line-strong",
-  ghost: "text-muted hover:text-fg hover:bg-white/5",
+  ghost: "text-muted hover:text-fg hover:bg-tint/5",
   danger: "bg-danger/10 text-danger border border-danger/25 hover:bg-danger/20",
   /** For use on top of colourful backgrounds and photos. */
-  light: "bg-white text-canvas hover:bg-white/90",
+  light: "bg-white text-[#0b0b0f] hover:bg-white/90",
   glass: "border border-white/20 bg-black/30 text-white backdrop-blur-md hover:bg-black/45",
 };
 

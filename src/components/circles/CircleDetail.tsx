@@ -191,7 +191,7 @@ function MemberView({ circle }: { circle: Circle }) {
             {circle.emoji}
           </span>
           {circle.description && (
-            <p className="mt-3 max-w-md text-[15px] font-medium text-white/90">{circle.description}</p>
+            <p className="mt-3 max-w-md text-[15px] font-medium text-white/90 wrap-anywhere">{circle.description}</p>
           )}
           <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-white">
             <span className="flex items-center gap-1 rounded-full bg-black/30 px-3 py-1.5 backdrop-blur">
@@ -323,7 +323,7 @@ function MemberView({ circle }: { circle: Circle }) {
                       <button
                         type="button"
                         onClick={() => setConfirm({ kind: "remove", member })}
-                        className="rounded-full p-1.5 text-subtle transition hover:bg-white/5 hover:text-danger"
+                        className="rounded-full p-1.5 text-subtle transition hover:bg-tint/5 hover:text-danger"
                         aria-label={`Remove ${member.name}`}
                       >
                         <X className="h-4 w-4" />
@@ -345,7 +345,7 @@ function MemberView({ circle }: { circle: Circle }) {
                         type="button"
                         onClick={() => cancel(pending.id)}
                         disabled={cancelling === pending.id}
-                        className="rounded-full p-1.5 text-subtle transition hover:bg-white/5 hover:text-fg disabled:opacity-50"
+                        className="rounded-full p-1.5 text-subtle transition hover:bg-tint/5 hover:text-fg disabled:opacity-50"
                         aria-label={`Cancel invite for ${user?.name ?? "this friend"}`}
                       >
                         {cancelling === pending.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}

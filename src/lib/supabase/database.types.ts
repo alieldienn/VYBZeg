@@ -236,6 +236,151 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          daily_reminder: boolean
+          last_reminded_on: string | null
+          push_circles: boolean
+          push_friends: boolean
+          push_plans: boolean
+          push_reactions: boolean
+          reminder_time: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          daily_reminder?: boolean
+          last_reminded_on?: string | null
+          push_circles?: boolean
+          push_friends?: boolean
+          push_plans?: boolean
+          push_reactions?: boolean
+          reminder_time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          daily_reminder?: boolean
+          last_reminded_on?: string | null
+          push_circles?: boolean
+          push_friends?: boolean
+          push_plans?: boolean
+          push_reactions?: boolean
+          reminder_time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          circle_id: string | null
+          comment_id: string | null
+          created_at: string
+          dedupe_key: string
+          detail: string | null
+          id: string
+          invite_id: string | null
+          poll_id: string | null
+          post_id: string | null
+          pushed_at: string | null
+          read_at: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          circle_id?: string | null
+          comment_id?: string | null
+          created_at?: string
+          dedupe_key: string
+          detail?: string | null
+          id?: string
+          invite_id?: string | null
+          poll_id?: string | null
+          post_id?: string | null
+          pushed_at?: string | null
+          read_at?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          circle_id?: string | null
+          comment_id?: string | null
+          created_at?: string
+          dedupe_key?: string
+          detail?: string | null
+          id?: string
+          invite_id?: string | null
+          poll_id?: string | null
+          post_id?: string | null
+          pushed_at?: string | null
+          read_at?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "circle_invites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_poll_id_fkey"
+            columns: ["poll_id"]
+            isOneToOne: false
+            referencedRelation: "polls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       poll_options: {
         Row: {
           category: string
@@ -359,6 +504,41 @@ export type Database = {
           {
             foreignKeyName: "polls_creator_id_fkey"
             columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_id?: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -504,6 +684,15 @@ export type Database = {
         Args: { p_circle_id: string }
         Returns: undefined
       }
+      claim_daily_reminders: {
+        Args: never
+        Returns: {
+          prompt_emoji: string
+          prompt_id: string
+          prompt_text: string
+          user_id: string
+        }[]
+      }
       create_poll: {
         Args: {
           p_circle_id: string
@@ -523,6 +712,10 @@ export type Database = {
           id: string
           username: string
         }[]
+      }
+      save_push_subscription: {
+        Args: { p_auth: string; p_endpoint: string; p_p256dh: string }
+        Returns: undefined
       }
     }
     Enums: {

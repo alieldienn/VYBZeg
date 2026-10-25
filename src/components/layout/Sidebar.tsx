@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CirclePlus } from "lucide-react";
 import { Logo, TAGLINE } from "@/components/brand/Logo";
+import { SidebarInstall } from "@/components/pwa/Install";
 import { Avatar } from "@/components/ui/Avatar";
 import { buttonStyles } from "@/components/ui/Button";
 import { Tag } from "@/components/ui/Tag";
@@ -40,7 +41,7 @@ export function SidebarPanel({ pathname }: { pathname: string | null }) {
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-all",
-                    active ? "bg-elevated text-fg" : "text-muted hover:bg-white/[0.04] hover:text-fg",
+                    active ? "bg-elevated text-fg" : "text-muted hover:bg-tint/[0.04] hover:text-fg",
                   )}
                 >
                   <Icon
@@ -61,13 +62,14 @@ export function SidebarPanel({ pathname }: { pathname: string | null }) {
       </Link>
 
       <div className="mt-auto space-y-3">
+        <SidebarInstall />
         <div className="rounded-2xl border border-line bg-surface p-3.5 text-xs leading-relaxed text-muted">
           <Tag>Beta</Tag>
-          <p className="mt-2">VYBZ is in beta. Notifications, the Weekly Recap and Arabic are coming soon.</p>
+          <p className="mt-2">VYBZ is in beta. The Weekly Recap, custom themes and Arabic are coming soon.</p>
         </div>
         <Link
           href="/profile"
-          className="flex items-center gap-3 rounded-2xl p-2 transition hover:bg-white/[0.04]"
+          className="flex items-center gap-3 rounded-2xl p-2 transition hover:bg-tint/[0.04]"
         >
           <Avatar user={me} size="md" />
           <span className="min-w-0">

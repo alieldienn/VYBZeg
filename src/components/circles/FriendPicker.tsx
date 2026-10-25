@@ -67,7 +67,7 @@ export function FriendPicker({ friends, selected, onChange, disabled = {} }: Fri
                 onClick={() => toggle(friend.id)}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition",
-                  note ? "opacity-50" : "hover:bg-white/[0.04]",
+                  note ? "opacity-50" : "hover:bg-tint/[0.04]",
                 )}
               >
                 <Avatar user={friend} size="md" />

@@ -10,7 +10,7 @@ export function Toaster() {
   return (
     <div
       aria-live={isError ? "assertive" : "polite"}
-      className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 lg:bottom-8 lg:pl-64"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 flex justify-center px-4 lg:bottom-8 lg:pl-64"
     >
       {toast && (
         <div

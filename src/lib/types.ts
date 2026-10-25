@@ -151,14 +151,37 @@ export type Poll = {
   lockedIn: boolean;
 };
 
+export type NotificationType =
+  | "friend_request"
+  | "friend_accepted"
+  | "reaction"
+  | "comment"
+  | "circle_invite"
+  | "circle_joined"
+  | "plan_created"
+  | "plan_vote"
+  | "plan_locked";
+
+/** One in-app notification (created by the database when something happens). */
+export type AppNotification = {
+  id: string;
+  type: NotificationType;
+  /** Who did it (their profile is loaded with the list). */
+  actorId: string | null;
+  createdAt: string;
+  read: boolean;
+  /** Reaction key, vote count, or the winning plan option. */
+  detail?: string;
+  circle?: { name: string; emoji: string };
+  pollQuestion?: string;
+  commentText?: string;
+  /** The existing screen it opens. */
+  href: string;
+};
+
 export type ReminderTime = "morning" | "afternoon" | "evening" | "surprise";
 
 export type Settings = {
-  dailyReminder: boolean;
-  reminderTime: ReminderTime;
-  notifyReactions: boolean;
-  notifyPlans: boolean;
-  notifyCircles: boolean;
   privateProfile: boolean;
   showActivity: boolean;
   reduceMotion: boolean;

@@ -10,8 +10,8 @@ export const REACTIONS: { key: ReactionKey; emoji: string; label: string }[] = [
 
 /** Gradient backgrounds used by text posts and circle covers. */
 export const THEME_GRADIENTS: Record<ThemeColor, string> = {
-  violet: "bg-linear-to-br from-brand-strong via-brand to-glow",
-  midnight: "bg-linear-to-br from-elevated via-violet-950 to-brand-strong",
+  violet: "bg-linear-to-br from-[#7c3aed] via-[#8b5cf6] to-[#c084fc]",
+  midnight: "bg-linear-to-br from-[#1a1a22] via-violet-950 to-[#7c3aed]",
   sunset: "bg-linear-to-br from-fuchsia-600 via-rose-500 to-orange-400",
   ocean: "bg-linear-to-br from-sky-600 via-indigo-600 to-violet-700",
   lime: "bg-linear-to-br from-lime-400 via-emerald-500 to-teal-600",
@@ -68,13 +68,8 @@ export const LIMITS = {
   maxImageMB: 10,
 } as const;
 
-/** Settings everyone starts with. (Only "Reduce motion" can be changed so far.) */
+/** Settings kept on this device. (Notification settings live in the database: see src/lib/push.ts.) */
 export const DEFAULT_SETTINGS: Settings = {
-  dailyReminder: true,
-  reminderTime: "surprise",
-  notifyReactions: true,
-  notifyPlans: true,
-  notifyCircles: false,
   privateProfile: true,
   showActivity: true,
   reduceMotion: false,

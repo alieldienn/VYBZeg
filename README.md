@@ -44,8 +44,12 @@ Other commands:
 - Profile photos are in a public bucket (`avatars`). Post photos are in a **private** bucket
   (`post-images`) and are shown through links that expire after an hour.
 - New plans are open for voting for 24 hours, or until their creator locks them in.
-- `supabase/tests/rls_tests.sql` holds 98 security tests. Paste it into the Supabase SQL editor and
-  run it: every row should say `passed = true`. It cleans up after itself.
+- Notifications (the bell on Home) are created only by the database, by triggers on real activity:
+  friend requests and accepts, reactions and comments on your vibes, circle invites and joins, new
+  plans, votes on your plans and locked-in plans. You only ever see and mark your own.
+- `supabase/tests/rls_tests.sql` (98 tests), `supabase/tests/notifications_tests.sql` (44 tests) and
+  `supabase/tests/push_tests.sql` check the security rules. Paste one into the Supabase SQL editor and run it: every row should say
+  `passed = true`. They clean up after themselves.
 
 ## Project structure
 
@@ -63,6 +67,8 @@ src/
     social.ts          Friends and circles (Supabase calls)
     posts.ts           Posts, photos, reactions, comments, daily prompts
     polls.ts           Plans and votes
+    notifications.ts   Notifications: load, count unread, mark as read
+    pwa.ts             Installing as an app, desktop shortcut, offline detection
     hooks/             usePosts, usePolls: each screen's own list of posts or plans
     auth/ profile/     Server actions for accounts and profiles
     supabase/          Supabase clients, generated database types, error messages
@@ -95,11 +101,54 @@ Colours are defined once in `src/app/globals.css`. Logo files:
 - `public/brand/vybz-app-icon.svg` and `vybz-app-icon-1024.png`: main app icon (purple tile)
 - `src/app/icon.svg`: favicon (simple purple V) · `src/app/apple-icon.png`: iPhone home-screen icon
 
-## Not built yet
+## Install as an app (PWA)
 
-- Notifications and daily reminders (the switches in Settings are marked "soon").
+VYBZ can be installed on phones and computers. The app-install pieces:
+
+- `src/app/manifest.ts`: name, colours and icons (`public/icons/`), served at `/manifest.webmanifest`
+- `public/sw.js`: the service worker. It only stores an offline screen (`public/offline.html`);
+  pages, data and photos always come from the network, so nothing private is kept on the device
+- `src/lib/pwa.ts` + `src/components/pwa/`: the Install card (Home), the Install row (Profile → App)
+  and the "You're offline" banner
+
+Installing needs HTTPS (or `localhost`), and the service worker only runs in a production build
+(`npm run build` then `npm start`).
+
+On computers, installing (Chrome/Edge) also creates a desktop shortcut. The sidebar explains how if the
+browser doesn't offer it, and on Mac/Linux it can download a shortcut file. (Windows browsers refuse to
+download `.url` shortcut files from websites, so on Windows it explains the browser's install menu and
+dragging the address-bar icon to the desktop instead.)
+
+## Themes
+
+Profile → App → Theme: **Dark** (default), **Light**, or **Auto** (follows the phone/computer).
+Saved on each device. Colours are tokens in `src/app/globals.css` (`:root[data-theme="light"]`
+holds the light values); `src/lib/theme-script.ts` applies the saved theme before the page paints,
+so there's no flash.
+
+## Phone notifications (push)
+
+- Profile → Notifications → **Turn on** saves this device (`push_subscriptions`). Switches there
+  choose what buzzes your phone (`notification_preferences`); the bell always shows everything.
+- When a notification is created, the database asks the Edge Function
+  `supabase/functions/send-push` to deliver it. An hourly job (pg_cron) sends the Daily Vibe
+  reminder (morning ≈ 9:00, afternoon ≈ 14:00, evening ≈ 20:00, surprise = 10:00–20:00 Cairo time),
+  only if you haven't posted that day.
+- Logging out switches alerts off on that device.
+- iPhone/iPad: alerts only work once VYBZ is installed to the Home Screen (iOS 16.4+).
+- Setup (once): the key pair is in two places.
+  - Public half: `NEXT_PUBLIC_VAPID_PUBLIC_KEY` in `.env.local` (and in your hosting's environment
+    variables when you deploy), plus `VAPID_PUBLIC_KEY` in the Edge Function.
+  - Private half: Supabase dashboard → Edge Functions → Secrets → `VAPID_PRIVATE_KEY`.
+    It must never go in the app's code or in git.
+- `supabase/tests/push_tests.sql` tests devices, preferences, queueing and reminders.
+
+## Not built yet (shown in the app as "Coming soon")
+
+- "Customize theme" (your own accent colour).
+- Writing: longer stories / journal entries (shown in the post composer, disabled).
 - The Weekly Recap (the circle page shows a preview of this week's numbers).
-- Light mode and Arabic.
+- Arabic.
 - Deleting your account. Before adding it, decide what happens to circles you created
   (today they would be left without an owner).
 - Changes from friends appear when you open or reload a screen, not live.

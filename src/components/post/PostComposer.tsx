@@ -4,10 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
-import { ImagePlus, Loader2, MapPin, Send, Trash2, Type, UsersRound } from "lucide-react";
+import { ImagePlus, Loader2, MapPin, NotebookPen, Send, Trash2, Type, UsersRound } from "lucide-react";
 import { PostCard } from "@/components/feed/PostCard";
 import { Button, buttonStyles } from "@/components/ui/Button";
-import { Tag } from "@/components/ui/Tag";
+import { ComingSoon, Tag } from "@/components/ui/Tag";
 import { Segmented } from "@/components/ui/Segmented";
 import { LIMITS, THEME_GRADIENTS, THEME_LABELS } from "@/lib/constants";
 import { cairoDay } from "@/lib/dates";
@@ -204,6 +204,19 @@ export function PostComposer() {
           { value: "text", label: "Text", icon: <Type className="h-4 w-4" /> },
         ]}
       />
+      {/* Long-form Writing isn't built yet: shown so people know it's coming, but it can't be opened. */}
+      <button
+        type="button"
+        disabled
+        className="-mt-3 flex w-full cursor-not-allowed items-center gap-3 rounded-2xl border border-dashed border-line px-3.5 py-2.5 text-left opacity-60"
+      >
+        <NotebookPen className="h-4 w-4 shrink-0 text-subtle" aria-hidden />
+        <span className="min-w-0 flex-1 text-sm">
+          <span className="font-medium text-muted">Writing</span>
+          <span className="text-subtle"> · longer stories and journal entries</span>
+        </span>
+        <ComingSoon />
+      </button>
 
       {mode === "photo" ? (
         <section className="space-y-3" aria-label="Photo">

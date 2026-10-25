@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0b0f" />
+    <title>You're offline · VYBZ</title>
+    <link rel="icon" href="/icons/icon-192.png" />
+    <!-- Shown by the service worker (public/sw.js) when a page can't load because
+         there's no connection. Everything is inline so it works with no network. -->
+    <script>
+      // Same saved theme as the app (see src/lib/theme-script.ts).
+      try {
+        var t = localStorage.getItem("vybz:theme");
+        if (t === "light" || (t === "system" && matchMedia("(prefers-color-scheme: light)").matches)) document.documentElement.dataset.theme = "light";
+      } catch (e) {}
+    </script>
+    <style>
+      :root { color-scheme: dark; --bg: #0b0b0f; --fg: #fff; --muted: #a0a0b8; --subtle: #6c6c84; }
+      :root[data-theme="light"] { color-scheme: light; --bg: #f6f5fa; --fg: #0f0f14; --muted: #5c5b70; --subtle: #84839a; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); }
+      body {
+        display: flex; align-items: center; justify-content: center;
+        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main { width: 100%; max-width: 360px; text-align: center; }
+      svg { width: 64px; height: 64px; }
+      h1 { margin: 20px 0 8px; font-size: 24px; line-height: 1.2; letter-spacing: -0.01em; }
+      p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
+      a {
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-top: 28px; min-height: 48px; padding: 0 28px; border-radius: 16px;
+        background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 50%, #a78bfa 100%);
+        color: #fff; font-weight: 600; font-size: 15px; text-decoration: none;
+        box-shadow: 0 8px 30px -8px rgb(139 92 246 / 0.6);
+      }
+      a:focus-visible { outline: 2px solid #a78bfa; outline-offset: 3px; }
+      small { display: block; margin-top: 16px; color: var(--subtle); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg viewBox="13 11 74 74" aria-hidden="true">
+        <defs>
+          <linearGradient id="v" x1="30" y1="15" x2="70" y2="85" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#A78BFA" />
+            <stop offset="0.5" stop-color="#8B5CF6" />
+            <stop offset="1" stop-color="#7C3AED" />
+          </linearGradient>
+        </defs>
+        <path fill="url(#v)" d="M30 45.5C29 41.5 31.5 38.5 34.6 38.2C37.2 38 38.8 39.6 39.4 41.8L45.2 61.5L62.6 40.2C64.4 37.9 67.7 37.5 69.8 39.3C71.6 40.9 71.8 43.5 70.4 45.5L50.4 79.6C48.4 83 45.4 84.6 42.6 83.6C40.6 82.9 39.4 81.4 38.8 79.4Z" />
+        <path fill="none" stroke="url(#v)" stroke-width="4.8" stroke-linecap="round" d="M44 27.5L48.6 34.6M55.2 17L55.2 26.6M66.6 22.8L62.6 31.2" />
+      </svg>
+      <h1>You're offline</h1>
+      <p>VYBZ needs a connection to show your friends' vibes, circles and plans. Nothing is saved on this device while you're offline.</p>
+      <a href="/">Try again</a>
+      <small>This page reloads by itself when you're back online.</small>
+    </main>
+    <script>
+      addEventListener("online", function () { location.reload(); });
+    </script>
+  </body>
+</html>

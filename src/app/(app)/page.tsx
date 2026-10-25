@@ -4,6 +4,8 @@ import { DailyVibeCard } from "@/components/feed/DailyVibeCard";
 import { Feed } from "@/components/feed/Feed";
 import { HomeAside } from "@/components/feed/HomeAside";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { InstallCard } from "@/components/pwa/Install";
 import { buttonStyles } from "@/components/ui/Button";
 
 export default function HomePage() {
@@ -15,15 +17,19 @@ export default function HomePage() {
           description="What your friends are up to today."
           brand
           action={
-            <span className="hidden sm:block lg:hidden">
-              <Link href="/post" className={buttonStyles({ size: "sm" })}>
-                <PenLine className="h-4 w-4" />
-                Post
-              </Link>
-            </span>
+            <>
+              <span className="hidden sm:block lg:hidden">
+                <Link href="/post" className={buttonStyles({ size: "sm" })}>
+                  <PenLine className="h-4 w-4" />
+                  Post
+                </Link>
+              </span>
+              <NotificationBell />
+            </>
           }
         />
         <div className="space-y-6">
+          <InstallCard />
           <DailyVibeCard />
           <Feed />
         </div>

@@ -54,7 +54,7 @@ export function ReactionBar({ post, interactive = true, onChange }: ReactionBarP
               "flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm transition-all duration-200",
               mine
                 ? "border-brand/50 bg-brand/15 text-fg"
-                : "border-line bg-white/[0.03] text-muted hover:border-line-strong hover:bg-white/[0.06] hover:text-fg",
+                : "border-line bg-tint/[0.03] text-muted hover:border-line-strong hover:bg-tint/[0.06] hover:text-fg",
               interactive ? "active:scale-95" : "cursor-default",
             )}
           >

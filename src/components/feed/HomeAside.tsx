@@ -44,7 +44,7 @@ export function HomeAside() {
                   <p className="text-xs text-muted">
                     {[circle && `${circle.emoji} ${circle.name}`, poll.whenLabel].filter(Boolean).join(" · ")}
                   </p>
-                  <p className="mt-1 text-sm font-semibold leading-snug">{poll.question}</p>
+                  <p className="mt-1 text-sm font-semibold leading-snug wrap-anywhere">{poll.question}</p>
                   <p className="mt-2 text-xs text-muted">
                     {total > 0
                       ? `Leading: ${PLAN_CATEGORIES[leader.category].emoji} ${leader.label} · ${Math.round((optionVotes(poll, leader) / total) * 100)}%`
@@ -79,7 +79,7 @@ export function HomeAside() {
             <li key={circle.id}>
               <Link
                 href={`/circles/${circle.id}`}
-                className="-mx-2 flex items-center gap-3 rounded-2xl px-2 py-2 transition hover:bg-white/[0.04]"
+                className="-mx-2 flex items-center gap-3 rounded-2xl px-2 py-2 transition hover:bg-tint/[0.04]"
               >
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-elevated text-lg" aria-hidden>
                   {circle.emoji}

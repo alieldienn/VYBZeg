@@ -5,18 +5,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { Bell, Camera, Flame, Globe2, Loader2, LogOut, MapPin, Palette, PenLine, ShieldCheck } from "lucide-react";
+import { Bell, Camera, Check, ChevronRight, Flame, Globe2, Loader2, LogOut, MapPin, Palette, PenLine, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { InstallRow } from "@/components/pwa/Install";
+import { PushSettings } from "./PushSettings";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, buttonStyles } from "@/components/ui/Button";
-import { Tag } from "@/components/ui/Tag";
+import { ComingSoon } from "@/components/ui/Tag";
 import { Segmented } from "@/components/ui/Segmented";
 import { Switch } from "@/components/ui/Switch";
 import { signOut } from "@/lib/auth/actions";
-import { REMINDER_TIMES, THEME_GRADIENTS } from "@/lib/constants";
+import { THEME_GRADIENTS } from "@/lib/constants";
 import { setAvatar } from "@/lib/profile/actions";
 import { useDailyVibe, usePosts } from "@/lib/hooks/usePosts";
+import { forgetThisDevice } from "@/lib/push";
 import { useVybz } from "@/lib/store";
+import { setTheme, useThemeChoice, type ThemeChoice } from "@/lib/theme";
 import { deleteAvatar, uploadAvatar } from "@/lib/supabase/uploads";
 import { cn } from "@/lib/utils";
 import { EditProfileSheet } from "./EditProfileSheet";
@@ -108,9 +112,9 @@ export function ProfileView() {
             </Button>
           </div>
 
-          <h2 className="mt-4 font-display text-2xl font-bold tracking-tight">{me.name}</h2>
+          <h2 className="mt-4 font-display text-2xl font-bold tracking-tight wrap-anywhere">{me.name}</h2>
           <p className="text-sm text-muted">@{me.username}</p>
-          {me.bio && <p className="mt-3 text-[15px] leading-relaxed">{me.bio}</p>}
+          {me.bio && <p className="mt-3 text-[15px] leading-relaxed wrap-anywhere">{me.bio}</p>}
           {me.area && (
             <p className="mt-2 flex items-center gap-1 text-xs text-muted">
               <MapPin className="h-3.5 w-3.5" aria-hidden />
@@ -194,7 +198,7 @@ export function ProfileView() {
                   post.background === "lime" ? "text-emerald-950" : "text-white",
                 )}
               >
-                <p className="line-clamp-5 font-display text-xs font-semibold leading-snug sm:text-sm">{post.text}</p>
+                <p className="line-clamp-5 font-display text-xs font-semibold leading-snug wrap-anywhere sm:text-sm">{post.text}</p>
               </div>
             ),
           )}
@@ -210,25 +214,8 @@ export function ProfileView() {
       </section>
 
       <div className="mt-10 space-y-6">
-        <SettingsGroup icon={<Bell className="h-4 w-4" />} title="Notifications" note={<Tag tone="soon">Soon</Tag>}>
-          <p className="pt-2 text-xs leading-relaxed text-muted">
-            Reminders and notifications arrive in a later update. These options are a preview and can&apos;t be
-            changed yet.
-          </p>
-          <Switch label="Daily Vibe reminder" description="A nudge when today's prompt drops" checked={false} onChange={() => {}} disabled />
-          <div className="pointer-events-none pb-3.5 opacity-40">
-            <p className="mb-2 text-xs text-muted">Remind me in the…</p>
-            <Segmented
-              label="Reminder time"
-              value="surprise"
-              onChange={() => {}}
-              options={REMINDER_TIMES.map((time) => ({ ...time, disabled: true }))}
-              className="flex-wrap"
-            />
-          </div>
-          <Switch label="Reactions" description="When friends react to your vibes" checked={false} onChange={() => {}} disabled />
-          <Switch label="Plans & polls" description="New plans and when a plan gets locked in" checked={false} onChange={() => {}} disabled />
-          <Switch label="Circle activity" description="Every new post in your circles" checked={false} onChange={() => {}} disabled />
+        <SettingsGroup icon={<Bell className="h-4 w-4" />} title="Notifications">
+          <PushSettings />
         </SettingsGroup>
 
         <SettingsGroup icon={<ShieldCheck className="h-4 w-4" />} title="Privacy">
@@ -255,25 +242,15 @@ export function ProfileView() {
         </SettingsGroup>
 
         <SettingsGroup icon={<Palette className="h-4 w-4" />} title="App">
+          <InstallRow />
           <Switch
             label="Reduce motion"
             description="Turn off animations. Saved on this device."
             checked={settings.reduceMotion}
             onChange={(reduceMotion) => updateSettings({ reduceMotion })}
           />
-          <Row label="Theme" note={<Tag tone="soon">Light mode soon</Tag>}>
-            <Segmented
-              label="Theme"
-              value="dark"
-              onChange={() => {}}
-              options={[
-                { value: "dark", label: "Dark" },
-                { value: "light", label: "Light", disabled: true },
-              ]}
-              className="w-40"
-            />
-          </Row>
-          <Row label="Language" note={<Tag tone="soon">Arabic soon</Tag>}>
+          <ThemeSettings />
+          <Row label="Language" note={<ComingSoon>Arabic coming soon</ComingSoon>}>
             <Segmented
               label="Language"
               value="en"
@@ -288,7 +265,14 @@ export function ProfileView() {
         </SettingsGroup>
 
         <SettingsGroup icon={<Globe2 className="h-4 w-4" />} title="Account">
-          <form action={signOut} className="flex items-center justify-between gap-4 py-3.5">
+          <form
+            action={async () => {
+              // Stop this device getting this account's alerts before logging out.
+              await forgetThisDevice();
+              await signOut();
+            }}
+            className="flex items-center justify-between gap-4 py-3.5"
+          >
             <div className="min-w-0">
               <p className="text-sm font-medium">Log out</p>
               <p className="mt-0.5 truncate text-xs text-muted">Signed in as {email}</p>
@@ -349,6 +333,94 @@ function SettingsGroup({
       </h2>
       <div className="mt-1 divide-y divide-line">{children}</div>
     </section>
+  );
+}
+
+const THEME_OPTIONS: { value: ThemeChoice; label: string; preview: ReactNode }[] = [
+  {
+    value: "dark",
+    label: "Dark",
+    preview: (
+      <span className="flex h-14 items-end gap-1 rounded-xl border border-white/10 bg-[#0b0b0f] p-2">
+        <span className="h-full w-1/3 rounded-md bg-[#1a1a22]" />
+        <span className="h-2/3 flex-1 rounded-md bg-[#8b5cf6]" />
+      </span>
+    ),
+  },
+  {
+    value: "light",
+    label: "Light",
+    preview: (
+      <span className="flex h-14 items-end gap-1 rounded-xl border border-black/10 bg-[#f6f5fa] p-2">
+        <span className="h-full w-1/3 rounded-md bg-white shadow-sm" />
+        <span className="h-2/3 flex-1 rounded-md bg-[#8b5cf6]" />
+      </span>
+    ),
+  },
+  {
+    value: "system",
+    label: "Auto",
+    preview: (
+      <span className="flex h-14 overflow-hidden rounded-xl border border-line">
+        <span className="flex flex-1 items-end bg-[#0b0b0f] p-2">
+          <span className="h-2/3 w-full rounded-md bg-[#8b5cf6]" />
+        </span>
+        <span className="flex flex-1 items-end bg-[#f6f5fa] p-2">
+          <span className="h-2/3 w-full rounded-md bg-[#8b5cf6]" />
+        </span>
+      </span>
+    ),
+  },
+];
+
+/** Theme: Dark, Light or Auto (follows the device), saved on this device. "Customize theme" isn't built yet. */
+function ThemeSettings() {
+  const choice = useThemeChoice();
+  return (
+    <>
+      <div className="py-3.5">
+        <p className="text-sm font-medium">Theme</p>
+        <p className="mt-0.5 text-xs text-muted">Saved on this device. Auto follows your phone or computer.</p>
+        <div className="mt-3 grid grid-cols-3 gap-2.5" role="radiogroup" aria-label="Theme">
+          {THEME_OPTIONS.map((option) => {
+            const selected = choice === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setTheme(option.value)}
+                className={cn(
+                  "flex min-w-0 flex-col gap-2 rounded-2xl border p-2.5 text-left transition active:scale-[0.98]",
+                  selected ? "border-brand/60 bg-brand/[0.08]" : "border-line hover:border-line-strong",
+                )}
+              >
+                <span aria-hidden>{option.preview}</span>
+                <span className="flex items-center justify-between gap-1 text-sm font-semibold">
+                  {option.label}
+                  {selected && <Check className="h-4 w-4 shrink-0 text-brand-soft" aria-hidden />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled
+        className="flex w-full cursor-not-allowed items-center justify-between gap-3 py-3.5 text-left opacity-55"
+      >
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+            Customize theme
+            <ComingSoon />
+          </span>
+          <span className="mt-0.5 block text-xs text-muted">Choose your own accent colour and how VYBZ looks.</span>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-subtle" aria-hidden />
+      </button>
+    </>
   );
 }
 

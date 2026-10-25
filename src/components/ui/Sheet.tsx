@@ -61,7 +61,7 @@ export function Sheet({ open, onClose, title, description, children, footer }: S
     >
       {open && (
         <div className="flex max-h-[90dvh] flex-col">
-          <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/15 sm:hidden" />
+          <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-tint/15 sm:hidden" />
           <header className="flex items-start justify-between gap-4 px-5 pb-3 pt-4 sm:px-6 sm:pt-6">
             <div>
               <h2 id="sheet-title" className="font-display text-xl font-semibold">
@@ -72,7 +72,7 @@ export function Sheet({ open, onClose, title, description, children, footer }: S
             <button
               type="button"
               onClick={onClose}
-              className="-mr-1 rounded-full p-2 text-muted transition hover:bg-white/5 hover:text-fg"
+              className="-mr-1 rounded-full p-2 text-muted transition hover:bg-tint/5 hover:text-fg"
               aria-label="Close"
             >
               <X className="h-5 w-5" />

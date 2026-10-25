@@ -39,6 +39,10 @@ function redirectWithCookies(url: URL, from: NextResponse) {
 }
 
 export const config = {
-  // Skip Next.js internals and static files (images, icons, fonts).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // Skip Next.js internals, static files (images, icons, fonts) and the app-install
+  // files. Browsers fetch the manifest without the login cookie, so those must never
+  // be redirected to /login. None of them contain private data.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };

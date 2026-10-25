@@ -160,7 +160,7 @@ export function NewPlanSheet({
                   <button
                     type="button"
                     onClick={() => setOptions(options.filter((_, i) => i !== index))}
-                    className="rounded-full p-1.5 text-subtle transition hover:bg-white/5 hover:text-fg"
+                    className="rounded-full p-1.5 text-subtle transition hover:bg-tint/5 hover:text-fg"
                     aria-label={`Remove ${option.label}`}
                   >
                     <X className="h-4 w-4" />

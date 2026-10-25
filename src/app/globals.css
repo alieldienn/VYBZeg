@@ -29,6 +29,9 @@
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
 
+  /* Faint overlays for hovers and subtle fills (white on dark, near-black on light). */
+  --color-tint: #ffffff;
+
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-bricolage), var(--font-geist), ui-sans-serif, sans-serif;
 
@@ -104,6 +107,36 @@
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+/*
+ * Light theme: the same tokens with light values. The theme is picked in
+ * Profile → App and set on <html data-theme="…"> before the page paints
+ * (see src/lib/theme-script.ts). Dark stays the default.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-canvas: #f6f5fa;
+  --color-surface: #ffffff;
+  --color-elevated: #f1eff7;
+  --color-raised: #e7e4f0;
+  --color-line: #e3e0ec;
+  --color-line-strong: #cfcadd;
+  --color-fg: #0f0f14;
+  --color-muted: #5c5b70;
+  --color-subtle: #84839a;
+  /* Darker purples so links and accents stay readable on white. */
+  --color-brand-strong: #6d28d9;
+  --color-brand-soft: #7c3aed;
+  --color-glow: #9333ea;
+  --color-success: #16a34a;
+  --color-warning: #c2710c;
+  --color-danger: #dc2626;
+  --color-tint: #0f0f14;
+}
+
+:root[data-theme="light"] .text-brand-gradient {
+  background-image: linear-gradient(120deg, #7c3aed 0%, #8b5cf6 45%, #9333ea 100%);
 }
 
 @layer base {
