@@ -10,18 +10,19 @@ import { cn } from "@/lib/utils";
 import { PostCard } from "./PostCard";
 
 const ALL = "all";
+const FRIENDS = "friends";
 
-/** The Home feed: vibes from all your circles, with chips to show one circle. */
+/** The Home feed: vibes from all your circles and friends, with chips to show just friends or one circle. */
 export function Feed() {
-  const { circles, social } = useVybz();
+  const { circles, friends, social } = useVybz();
   const [filter, setFilter] = useState<string>(ALL);
 
-  if (social.status === "ready" && circles.length === 0) {
+  if (social.status === "ready" && circles.length === 0 && friends.length === 0) {
     return (
       <div className="rounded-[28px] border border-dashed border-line-strong px-6 py-12 text-center">
-        <p className="font-display text-lg font-semibold">Your feed lives in your circles</p>
+        <p className="font-display text-lg font-semibold">Your feed is your people</p>
         <p className="mt-1 text-sm text-muted">
-          Vibes are only shared inside circles. Start one with your closest people, or ask a friend to invite you.
+          Add friends to see what they share with all their friends, or start a circle with your closest people.
         </p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           <Link href="/circles" className={buttonStyles()}>
@@ -36,7 +37,8 @@ export function Feed() {
   }
 
   const chips = [
-    { id: ALL, label: "All circles" },
+    { id: ALL, label: "Everything" },
+    { id: FRIENDS, label: "👥 Friends" },
     ...circles.map((circle) => ({ id: circle.id, label: `${circle.emoji} ${circle.name}` })),
   ];
 
@@ -61,13 +63,14 @@ export function Feed() {
         ))}
       </div>
       {/* A new list (and fresh loading state) for each filter. */}
-      <FeedList key={filter} circleId={filter === ALL ? undefined : filter} />
+      <FeedList key={filter} filter={filter} />
     </section>
   );
 }
 
-function FeedList({ circleId }: { circleId?: string }) {
-  const feed = usePosts({ circleId });
+function FeedList({ filter }: { filter: string }) {
+  const circleId = filter === ALL || filter === FRIENDS ? undefined : filter;
+  const feed = usePosts({ circleId, friendsOnly: filter === FRIENDS });
 
   if (feed.status === "loading") {
     return (

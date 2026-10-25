@@ -31,7 +31,7 @@ export type Prompt = {
 export type Post = {
   id: string;
   authorId: string;
-  /** The circle it was shared in. Only null in the composer before one is picked. */
+  /** The circle it was shared in, or null when shared with all the author's friends. */
   circleId: string | null;
   promptId: string | null;
   /** The prompt it answers, if any (loaded with the post). */

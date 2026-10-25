@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { fetchDailyVibe, fetchPosts, type DailyVibe } from "@/lib/posts";
+import { fetchDailyVibe, fetchPosts, type DailyVibe, type PostFilter } from "@/lib/posts";
 import { useVybz } from "@/lib/store";
 import type { Post } from "@/lib/types";
 
@@ -15,11 +15,11 @@ type PostList = {
 };
 
 /**
- * A list of posts for one screen: the Home feed (no filter), one circle, or
- * one person. Loads when the screen opens or is shown again, and whenever
- * `postsVersion` changes (someone posted or deleted).
+ * A list of posts for one screen: the Home feed (no filter), one circle,
+ * "All friends" posts only, or one person. Loads when the screen opens or is
+ * shown again, and whenever `postsVersion` changes (someone posted or deleted).
  */
-export function usePosts({ circleId, authorId }: { circleId?: string; authorId?: string } = {}) {
+export function usePosts({ circleId, friendsOnly, authorId }: PostFilter = {}) {
   const router = useRouter();
   const { userId, postsVersion, mergeUsers, showToast } = useVybz();
   const [list, setList] = useState<PostList>({ status: "loading", posts: [], hasMore: false, loadingMore: false });
@@ -59,25 +59,25 @@ export function usePosts({ circleId, authorId }: { circleId?: string; authorId?:
   // screen changed (e.g. you switched filters), so old data never overwrites new.
   useEffect(() => {
     let cancelled = false;
-    fetchPosts(userId, { circleId, authorId }).then((result) => {
+    fetchPosts(userId, { circleId, friendsOnly, authorId }).then((result) => {
       if (!cancelled) apply(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [userId, circleId, authorId, postsVersion, apply]);
+  }, [userId, circleId, friendsOnly, authorId, postsVersion, apply]);
 
   return {
     ...list,
     retry: () => {
       setList((current) => ({ ...current, status: "loading" }));
-      fetchPosts(userId, { circleId, authorId }).then((result) => apply(result));
+      fetchPosts(userId, { circleId, friendsOnly, authorId }).then((result) => apply(result));
     },
     loadMore: () => {
       const oldest = list.posts.at(-1);
       if (!oldest || list.loadingMore) return;
       setList((current) => ({ ...current, loadingMore: true }));
-      fetchPosts(userId, { circleId, authorId, before: oldest.createdAt }).then((result) =>
+      fetchPosts(userId, { circleId, friendsOnly, authorId, before: oldest.createdAt }).then((result) =>
         apply(result, oldest.createdAt),
       );
     },

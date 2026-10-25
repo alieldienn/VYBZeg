@@ -6,8 +6,8 @@ import { UsernameField } from "@/components/profile/UsernameField";
 import { Avatar } from "@/components/ui/Avatar";
 import { FormError, TextField } from "@/components/ui/TextField";
 import { completeOnboarding, signOut, type FormState } from "@/lib/auth/actions";
-import { LIMITS } from "@/lib/constants";
 import { useUsernameCheck } from "@/lib/hooks/useUsernameCheck";
+import { IMAGE_ACCEPT, imageFileError, toBrowserImage } from "@/lib/images";
 import { deleteAvatar, uploadAvatar } from "@/lib/supabase/uploads";
 import { DISPLAY_NAME_MAX } from "@/lib/validation";
 import { AuthHeading, SubmitButton } from "./AuthForms";
@@ -50,16 +50,23 @@ export function OnboardingForm({ userId, email }: { userId: string; email: strin
   // Free the temporary preview link when the photo changes or the page closes.
   useEffect(() => () => (photo ? URL.revokeObjectURL(photo.preview) : undefined), [photo]);
 
-  function onPhotoChange(event: ChangeEvent<HTMLInputElement>) {
+  async function onPhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     setPhotoError(null);
     if (!file) return;
-    if (!file.type.startsWith("image/") || file.size > LIMITS.maxImageMB * 1024 * 1024) {
-      setPhotoError(`Pick a photo (JPG, PNG or WebP) under ${LIMITS.maxImageMB} MB.`);
+    const problem = imageFileError(file);
+    if (problem) {
+      setPhotoError(problem);
       return;
     }
-    setPhoto({ file, preview: URL.createObjectURL(file) });
+    try {
+      // iPhone HEIC photos become JPEGs, so the preview works in every browser.
+      const usable = await toBrowserImage(file);
+      setPhoto({ file: usable, preview: URL.createObjectURL(usable) });
+    } catch (failure) {
+      setPhotoError((failure as Error).message);
+    }
   }
 
   return (
@@ -83,7 +90,7 @@ export function OnboardingForm({ userId, email }: { userId: string; email: strin
             >
               <Camera className="h-4 w-4" />
             </button>
-            <input ref={photoInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/heic" className="hidden" onChange={onPhotoChange} />
+            <input ref={photoInput} type="file" accept={IMAGE_ACCEPT} className="hidden" onChange={onPhotoChange} />
           </div>
           <div className="min-w-0 text-sm">
             <p className="font-medium">Profile photo</p>

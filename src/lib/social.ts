@@ -57,6 +57,7 @@ export async function fetchSocial(userId: string): Promise<Result<{ data?: Socia
         supabase
           .from("posts")
           .select("circle_id, author_id, created_at")
+          .not("circle_id", "is", null) // "All friends" posts don't count towards circle stats.
           .gte("created_at", daysAgoIso(STATS_DAYS))
           .order("created_at", { ascending: false })
           .limit(2000),
@@ -141,7 +142,7 @@ const ROLE_ORDER: Record<CircleRole, number> = { owner: 0, admin: 1, member: 2 }
 /** Posts and plans from the last few weeks only feed the stats; older ones don't affect them. */
 const STATS_DAYS = 35;
 
-type RecentPost = { circle_id: string; author_id: string; created_at: string };
+type RecentPost = { circle_id: string | null; author_id: string; created_at: string };
 type RecentPlan = { circle_id: string; creator_id: string; created_at: string };
 
 function toCircle(row: CircleRow, posts: RecentPost[], plans: RecentPlan[], today: string): Circle {

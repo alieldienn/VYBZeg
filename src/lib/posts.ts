@@ -3,8 +3,9 @@
  *
  * Every call runs as the logged-in user, so Row Level Security decides what
  * is visible: you only ever get posts (and photos, reactions, comments) from
- * circles you're a member of. Post photos live in the PRIVATE `post-images`
- * bucket and are shown through signed links that expire after an hour.
+ * circles you're a member of, plus "All friends" posts from your friends.
+ * Post photos live in the PRIVATE `post-images` bucket and are shown through
+ * signed links that expire after an hour.
  */
 import { cairoDay, daysAgoIso, streakFrom } from "@/lib/dates";
 import { prepareImage } from "@/lib/images";
@@ -31,17 +32,22 @@ const NO_REACTIONS: Record<ReactionKey, number> = { fire: 0, lol: 0, love: 0, ca
 
 export type PostPage = { posts: Post[]; users: User[]; hasMore: boolean };
 
+/** Which posts a list shows: one circle, only "All friends" posts, one person, or (none set) everything you can see. */
+export type PostFilter = { circleId?: string; friendsOnly?: boolean; authorId?: string };
+
 /**
- * Newest posts first. Without filters: every circle you're in (the Home feed).
+ * Newest posts first. Without filters: every circle you're in plus your
+ * friends' "All friends" posts (the Home feed).
  * `before` loads the next page (posts older than that time).
  */
 export async function fetchPosts(
   userId: string,
-  { circleId, authorId, before, limit = 20 }: { circleId?: string; authorId?: string; before?: string; limit?: number } = {},
+  { circleId, friendsOnly, authorId, before, limit = 20 }: PostFilter & { before?: string; limit?: number } = {},
 ): Promise<Result<{ page?: PostPage }>> {
   const supabase = createClient();
   let query = supabase.from("posts").select(POST_SELECT).order("created_at", { ascending: false }).limit(limit);
   if (circleId) query = query.eq("circle_id", circleId);
+  else if (friendsOnly) query = query.is("circle_id", null);
   if (authorId) query = query.eq("author_id", authorId);
   if (before) query = query.lt("created_at", before);
 
@@ -93,7 +99,8 @@ export async function fetchPosts(
 
 export type NewPost = {
   userId: string;
-  circleId: string;
+  /** The circle to share in, or null for all your friends. */
+  circleId: string | null;
   /** A photo from the device, for photo posts. */
   photo?: File;
   text: string;
@@ -110,15 +117,16 @@ export async function createPost(input: NewPost): Promise<Result<{ id?: string }
   if (input.photo) {
     let blob: Blob;
     try {
-      blob = await prepareImage(input.photo, { maxSide: 1600 });
+      blob = await prepareImage(input.photo, { maxSide: 1600, keepGif: true });
     } catch (error) {
       return { error: (error as Error).message };
     }
-    // Folder layout <circle>/<you>/<random>.jpg is what the storage rules check.
-    imagePath = `${input.circleId}/${input.userId}/${crypto.randomUUID()}.jpg`;
+    // Folder layout <circle or "friends">/<you>/<random> is what the storage rules check.
+    const gif = blob.type === "image/gif";
+    imagePath = `${input.circleId ?? "friends"}/${input.userId}/${crypto.randomUUID()}.${gif ? "gif" : "jpg"}`;
     const upload = await supabase.storage
       .from(POST_IMAGES)
-      .upload(imagePath, blob, { contentType: "image/jpeg", cacheControl: "3600", upsert: false });
+      .upload(imagePath, blob, { contentType: gif ? "image/gif" : "image/jpeg", cacheControl: "3600", upsert: false });
     if (upload.error) {
       return /row-level security|unauthorized|403/i.test(upload.error.message)
         ? { error: "You can only post in circles you're a member of." }

@@ -11,6 +11,7 @@ import { ComingSoon, Tag } from "@/components/ui/Tag";
 import { Segmented } from "@/components/ui/Segmented";
 import { LIMITS, THEME_GRADIENTS, THEME_LABELS } from "@/lib/constants";
 import { cairoDay } from "@/lib/dates";
+import { IMAGE_ACCEPT, imageFileError, toBrowserImage } from "@/lib/images";
 import { createPost, fetchRecentPrompts } from "@/lib/posts";
 import { useVybz } from "@/lib/store";
 import type { Post, Prompt, ThemeColor } from "@/lib/types";
@@ -21,12 +22,14 @@ type PickedImage = { url: string; file: File };
 
 const BACKGROUNDS = Object.keys(THEME_GRADIENTS) as ThemeColor[];
 const LOCATION_MAX = 40;
+/** The "Share with" choice for all your friends (any other choice is a circle id). */
+const FRIENDS = "friends";
 
 /** Reads ?circle= and ?prompt= from the address, so it must sit inside <Suspense>. */
 export function PostComposer() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { me, circles, social, showToast, postsChanged, reloadSocial } = useVybz();
+  const { me, circles, friends, social, showToast, postsChanged, reloadSocial } = useVybz();
 
   const [mode, setMode] = useState<Mode>("photo");
   const [image, setImage] = useState<PickedImage | null>(null);
@@ -41,6 +44,7 @@ export function PostComposer() {
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [opening, setOpening] = useState(false);
   const [publishing, setPublishing] = useState<null | "uploading" | "posting">(null);
 
   const fileInput = useRef<HTMLInputElement>(null);
@@ -69,11 +73,19 @@ export function PostComposer() {
         ? askedPrompt
         : (todaysPrompt?.id ?? null);
 
-  // The circle: your pick, else ?circle= from the address, else your only circle.
+  // Who sees it: your pick, else ?circle= from the address, else your only
+  // circle, else (no circles) all your friends. Otherwise you have to choose.
   const askedCircle = searchParams.get("circle");
-  const circleId =
+  const audience =
     circleChoice ??
-    (circles.some((c) => c.id === askedCircle) ? askedCircle : circles.length === 1 ? circles[0].id : null);
+    (circles.some((c) => c.id === askedCircle)
+      ? askedCircle
+      : circles.length === 1
+        ? circles[0].id
+        : circles.length === 0
+          ? FRIENDS
+          : null);
+  const circleId = audience === FRIENDS ? null : audience;
   const circle = circles.find((c) => c.id === circleId);
 
   function replaceImage(next: PickedImage | null) {
@@ -82,18 +94,24 @@ export function PostComposer() {
     setImage(next);
   }
 
-  function handleFile(file: File | undefined) {
+  async function handleFile(file: File | undefined) {
     setError(null);
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("That file isn't a photo. Try a JPG, PNG or WebP image.");
+    const problem = imageFileError(file);
+    if (problem) {
+      setError(problem);
       return;
     }
-    if (file.size > LIMITS.maxImageMB * 1024 * 1024) {
-      setError(`That photo is too big. Please pick one under ${LIMITS.maxImageMB} MB.`);
-      return;
+    // iPhone HEIC photos become JPEGs here, so the preview works in every browser.
+    setOpening(true);
+    try {
+      const usable = await toBrowserImage(file);
+      replaceImage({ url: URL.createObjectURL(usable), file: usable });
+    } catch (failure) {
+      setError((failure as Error).message);
+    } finally {
+      setOpening(false);
     }
-    replaceImage({ url: URL.createObjectURL(file), file });
   }
 
   function onFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -111,7 +129,8 @@ export function PostComposer() {
   const draft: Post = {
     id: "draft",
     authorId: me.id,
-    circleId,
+    // "" while nothing is picked, so the preview shows no audience badge yet.
+    circleId: audience === null ? "" : circleId,
     promptId,
     prompt: chosenPrompt ? { emoji: chosenPrompt.emoji, text: chosenPrompt.text } : undefined,
     kind: mode,
@@ -127,17 +146,17 @@ export function PostComposer() {
   };
 
   const hasContent = mode === "photo" ? Boolean(image) : text.trim().length > 0;
-  const canPublish = hasContent && Boolean(circleId) && !publishing;
+  const canPublish = hasContent && audience !== null && !publishing && !opening;
   const missingHint = !hasContent
     ? mode === "photo"
       ? "Add a photo to post"
       : "Write something to post"
-    : !circleId
-      ? "Pick a circle"
+    : audience === null
+      ? "Pick who sees it"
       : "Publish vibe";
 
   async function publish() {
-    if (!canPublish || !circleId) return;
+    if (!canPublish) return;
     setError(null);
     setPublishing(mode === "photo" ? "uploading" : "posting");
     const result = await createPost({
@@ -155,7 +174,7 @@ export function PostComposer() {
       if (result.expired) router.push("/login");
       return;
     }
-    showToast(`Vibe posted to ${circle?.emoji ?? ""} ${circle?.name ?? "your circle"}`);
+    showToast(circleId ? `Vibe posted to ${circle?.emoji ?? ""} ${circle?.name ?? "your circle"}` : "Vibe shared with all your friends");
     postsChanged();
     void reloadSocial(); // Updates "new today" and streaks on circle cards.
     resetDraft();
@@ -175,17 +194,22 @@ export function PostComposer() {
     setError(null);
   }
 
-  if (social.status === "ready" && circles.length === 0) {
+  if (social.status === "ready" && circles.length === 0 && friends.length === 0) {
     return (
       <div className="mx-auto max-w-md rounded-[28px] border border-dashed border-line-strong px-6 py-12 text-center">
         <UsersRound className="mx-auto h-10 w-10 text-brand-soft" aria-hidden />
-        <p className="mt-3 font-display text-lg font-semibold">You need a circle to post</p>
+        <p className="mt-3 font-display text-lg font-semibold">Add someone to share with</p>
         <p className="mt-1 text-sm text-muted">
-          Vibes are only shared inside circles, so only your closest people see them.
+          Vibes go to your friends or to one of your circles, so add a friend or join a circle first.
         </p>
-        <Link href="/circles" className={buttonStyles({ className: "mt-5" })}>
-          Start or join a circle
-        </Link>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <Link href="/friends" className={buttonStyles()}>
+            Add friends
+          </Link>
+          <Link href="/circles" className={buttonStyles({ variant: "secondary" })}>
+            Start or join a circle
+          </Link>
+        </div>
       </div>
     );
   }
@@ -244,6 +268,8 @@ export function PostComposer() {
             <button
               type="button"
               onClick={() => fileInput.current?.click()}
+              disabled={opening}
+              aria-busy={opening}
               onDragOver={(event) => {
                 event.preventDefault();
                 setDragging(true);
@@ -256,10 +282,10 @@ export function PostComposer() {
               )}
             >
               <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/15 text-brand-soft">
-                <ImagePlus className="h-7 w-7" />
+                {opening ? <Loader2 className="h-7 w-7 animate-spin" aria-hidden /> : <ImagePlus className="h-7 w-7" />}
               </span>
               <span>
-                <span className="block font-semibold">Choose a photo</span>
+                <span className="block font-semibold">{opening ? "Opening photo…" : "Choose a photo"}</span>
                 <span className="mt-1 block text-sm text-muted">
                   Tap to pick from your device <span className="hidden sm:inline">or drag one here</span> · up to{" "}
                   {LIMITS.maxImageMB} MB
@@ -270,11 +296,14 @@ export function PostComposer() {
           <input
             ref={fileInput}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif,image/heic"
+            accept={IMAGE_ACCEPT}
             className="hidden"
             onChange={onFileChange}
           />
-          <p className="text-xs text-subtle">Photos are resized and their hidden location data is removed before upload.</p>
+          <p className="text-xs text-subtle">
+            Any image type works, including iPhone HEIC photos and animated GIFs. Photos are resized and their hidden
+            location data is removed before upload.
+          </p>
 
           <Field label="Caption" count={caption.length} max={LIMITS.caption}>
             <textarea
@@ -321,14 +350,17 @@ export function PostComposer() {
         </section>
       )}
 
-      <section aria-label="Circle">
+      <section aria-label="Share with">
         <p className="mb-2 text-sm font-medium">Share with</p>
         {social.status === "loading" ? (
           <p className="flex items-center gap-2 text-sm text-muted">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading your circles…
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading your friends and circles…
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
+            <ChoiceChip active={audience === FRIENDS} onClick={() => setCircleChoice(FRIENDS)}>
+              <UsersRound className="h-4 w-4" aria-hidden /> All friends
+            </ChoiceChip>
             {circles.map((c) => (
               <ChoiceChip key={c.id} active={circleId === c.id} onClick={() => setCircleChoice(c.id)}>
                 <span aria-hidden>{c.emoji}</span> {c.name}
@@ -336,7 +368,13 @@ export function PostComposer() {
             ))}
           </div>
         )}
-        <p className="mt-2 text-xs text-subtle">Only members of this circle will see it.</p>
+        <p className="mt-2 text-xs text-subtle">
+          {audience === FRIENDS
+            ? "All your friends will see it in their feed."
+            : audience
+              ? "Only members of this circle will see it."
+              : "Pick all your friends or one circle."}
+        </p>
       </section>
 
       <section aria-label="Prompt">

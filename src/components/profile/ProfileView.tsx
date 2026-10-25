@@ -18,6 +18,7 @@ import { signOut } from "@/lib/auth/actions";
 import { THEME_GRADIENTS } from "@/lib/constants";
 import { setAvatar } from "@/lib/profile/actions";
 import { useDailyVibe, usePosts } from "@/lib/hooks/usePosts";
+import { IMAGE_ACCEPT } from "@/lib/images";
 import { forgetThisDevice } from "@/lib/push";
 import { useVybz } from "@/lib/store";
 import { setTheme, useThemeChoice, type ThemeChoice } from "@/lib/theme";
@@ -101,7 +102,7 @@ export function ProfileView() {
               <input
                 ref={photoInput}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,image/heic"
+                accept={IMAGE_ACCEPT}
                 className="hidden"
                 onChange={onPhotoChange}
               />

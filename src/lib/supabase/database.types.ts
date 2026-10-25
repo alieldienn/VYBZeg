@@ -99,6 +99,45 @@ export type Database = {
           },
         ]
       }
+      circle_messages: {
+        Row: {
+          author_id: string
+          circle_id: string
+          content: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          author_id?: string
+          circle_id: string
+          content: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          author_id?: string
+          circle_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "circle_messages_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "circle_messages_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       circles: {
         Row: {
           color: string
@@ -549,7 +588,7 @@ export type Database = {
         Row: {
           author_id: string
           background: string | null
-          circle_id: string
+          circle_id: string | null
           content: string | null
           created_at: string
           id: string
@@ -560,7 +599,7 @@ export type Database = {
         Insert: {
           author_id?: string
           background?: string | null
-          circle_id: string
+          circle_id?: string | null
           content?: string | null
           created_at?: string
           id?: string
@@ -571,7 +610,7 @@ export type Database = {
         Update: {
           author_id?: string
           background?: string | null
-          circle_id?: string
+          circle_id?: string | null
           content?: string | null
           created_at?: string
           id?: string

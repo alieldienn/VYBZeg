@@ -10,6 +10,7 @@ import {
   ImageIcon,
   Loader2,
   LogOut,
+  MessagesSquare,
   PenLine,
   Sparkles,
   Trash2,
@@ -25,6 +26,7 @@ import { PollCard } from "@/components/plans/PollCard";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, buttonStyles } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { Segmented } from "@/components/ui/Segmented";
 import { Tag } from "@/components/ui/Tag";
 import { REACTIONS, THEME_GRADIENTS } from "@/lib/constants";
 import { acceptInvite, cancelInvite, deleteCircle, leaveCircle, removeMember } from "@/lib/social";
@@ -34,6 +36,7 @@ import { usePosts } from "@/lib/hooks/usePosts";
 import { useVybz } from "@/lib/store";
 import type { ActivityKind, Circle, CircleInvite, CircleRole, ReactionKey, User } from "@/lib/types";
 import { agoText, cn, pluralize, reactionCount } from "@/lib/utils";
+import { CircleChat } from "./CircleChat";
 import { InviteSheet } from "./InviteSheet";
 
 const ACTIVITY_ICONS: Record<ActivityKind, LucideIcon> = {
@@ -109,7 +112,7 @@ function InvitePreview({ invite }: { invite: CircleInvite }) {
         <p className="mt-2 text-sm font-medium text-white/90">
           {inviter ? `${inviter.name} (@${inviter.username})` : "A friend"} invited you to join.
         </p>
-        <p className="mt-1 text-xs text-white/75">Join to see the members, posts and plans inside.</p>
+        <p className="mt-1 text-xs text-white/75">Join to see the members, posts, plans and chat inside.</p>
         <div className="mt-6 flex justify-center gap-2">
           <Button variant="glass" onClick={() => respond(false)} disabled={busy !== null}>
             {busy === "decline" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
@@ -134,6 +137,7 @@ function MemberView({ circle }: { circle: Circle }) {
   const [planning, setPlanning] = useState(false);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [tab, setTab] = useState<"vibes" | "chat">("vibes");
   const feed = usePosts({ circleId: circle.id });
   const plans = usePolls({ circleId: circle.id });
 
@@ -227,74 +231,89 @@ function MemberView({ circle }: { circle: Circle }) {
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-8">
-          <section aria-labelledby="recap-title" className="rounded-[28px] border border-line bg-surface p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h2 id="recap-title" className="flex items-center gap-2 font-display text-lg font-semibold">
-                <Sparkles className="h-4 w-4 text-brand-soft" aria-hidden />
-                This week
-              </h2>
-              <Tag tone="soon">Weekly Recap preview</Tag>
-            </div>
-            <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
-              <Stat label="Vibes shared" value={feed.status === "ready" ? `${weekPosts.length}${feed.hasMore && weekPosts.length === feed.posts.length ? "+" : ""}` : "–"} />
-              <Stat label="Plans made" value={plans.status === "ready" ? String(weekPlans.length) : "–"} />
-              <Stat label="Top reaction" value={topReaction.total > 0 ? topReaction.emoji : "–"} />
-            </dl>
-            <p className="mt-4 text-xs text-muted">
-              Every Friday you&apos;ll get a recap of your circle&apos;s best moments. Coming in a later milestone.
-            </p>
-          </section>
-
-          {circlePolls.length > 0 && (
-            <section aria-labelledby="circle-plans">
-              <h2 id="circle-plans" className="mb-3 font-display text-lg font-semibold">
-                Plans
-              </h2>
-              <div className="space-y-4">
-                {circlePolls.map((poll) => (
-                  <PollCard key={poll.id} poll={poll} showCircle={false} onChange={plans.updatePoll} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section aria-labelledby="circle-posts">
-            <h2 id="circle-posts" className="mb-3 font-display text-lg font-semibold">
-              Shared in {circle.name}
-            </h2>
-            {feed.status === "loading" ? (
-              <div className="h-80 animate-pulse rounded-[28px] bg-surface" role="status" aria-label="Loading vibes" />
-            ) : feed.status === "error" ? (
-              <div className="rounded-[28px] border border-danger/30 bg-danger/[0.06] px-6 py-8 text-center" role="alert">
-                <p className="text-sm text-muted">{feed.error}</p>
-                <Button variant="secondary" size="sm" className="mt-3" onClick={feed.retry}>
-                  Try again
-                </Button>
-              </div>
-            ) : feed.posts.length > 0 ? (
-              <div className="space-y-4">
-                {feed.posts.map((post) => (
-                  <PostCard key={post.id} post={post} onChange={feed.updatePost} onRemove={feed.removePost} />
-                ))}
-                {feed.hasMore && (
-                  <div className="flex justify-center">
-                    <Button variant="secondary" onClick={feed.loadMore} disabled={feed.loadingMore}>
-                      {feed.loadingMore && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-                      Load more
+          <Segmented
+            label="Circle view"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: "vibes", label: "Vibes & plans", icon: <ImageIcon className="h-4 w-4" /> },
+              { value: "chat", label: "Chat", icon: <MessagesSquare className="h-4 w-4" /> },
+            ]}
+          />
+          {tab === "chat" ? (
+            <CircleChat circle={circle} />
+          ) : (
+            <>
+              <section aria-labelledby="recap-title" className="rounded-[28px] border border-line bg-surface p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 id="recap-title" className="flex items-center gap-2 font-display text-lg font-semibold">
+                    <Sparkles className="h-4 w-4 text-brand-soft" aria-hidden />
+                    This week
+                  </h2>
+                  <Tag tone="soon">Weekly Recap preview</Tag>
+                </div>
+                <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
+                  <Stat label="Vibes shared" value={feed.status === "ready" ? `${weekPosts.length}${feed.hasMore && weekPosts.length === feed.posts.length ? "+" : ""}` : "–"} />
+                  <Stat label="Plans made" value={plans.status === "ready" ? String(weekPlans.length) : "–"} />
+                  <Stat label="Top reaction" value={topReaction.total > 0 ? topReaction.emoji : "–"} />
+                </dl>
+                <p className="mt-4 text-xs text-muted">
+                  Every Friday you&apos;ll get a recap of your circle&apos;s best moments. Coming in a later milestone.
+                </p>
+              </section>
+    
+              {circlePolls.length > 0 && (
+                <section aria-labelledby="circle-plans">
+                  <h2 id="circle-plans" className="mb-3 font-display text-lg font-semibold">
+                    Plans
+                  </h2>
+                  <div className="space-y-4">
+                    {circlePolls.map((poll) => (
+                      <PollCard key={poll.id} poll={poll} showCircle={false} onChange={plans.updatePoll} />
+                    ))}
+                  </div>
+                </section>
+              )}
+    
+              <section aria-labelledby="circle-posts">
+                <h2 id="circle-posts" className="mb-3 font-display text-lg font-semibold">
+                  Shared in {circle.name}
+                </h2>
+                {feed.status === "loading" ? (
+                  <div className="h-80 animate-pulse rounded-[28px] bg-surface" role="status" aria-label="Loading vibes" />
+                ) : feed.status === "error" ? (
+                  <div className="rounded-[28px] border border-danger/30 bg-danger/[0.06] px-6 py-8 text-center" role="alert">
+                    <p className="text-sm text-muted">{feed.error}</p>
+                    <Button variant="secondary" size="sm" className="mt-3" onClick={feed.retry}>
+                      Try again
                     </Button>
                   </div>
+                ) : feed.posts.length > 0 ? (
+                  <div className="space-y-4">
+                    {feed.posts.map((post) => (
+                      <PostCard key={post.id} post={post} onChange={feed.updatePost} onRemove={feed.removePost} />
+                    ))}
+                    {feed.hasMore && (
+                      <div className="flex justify-center">
+                        <Button variant="secondary" onClick={feed.loadMore} disabled={feed.loadingMore}>
+                          {feed.loadingMore && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+                          Load more
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-[28px] border border-dashed border-line-strong px-6 py-10 text-center">
+                    <p className="font-semibold">No vibes here yet</p>
+                    <p className="mt-1 text-sm text-muted">Be the first to share something with {circle.name}.</p>
+                    <Link href={`/post?circle=${circle.id}`} className={buttonStyles({ size: "sm", className: "mt-4" })}>
+                      Post a vibe
+                    </Link>
+                  </div>
                 )}
-              </div>
-            ) : (
-              <div className="rounded-[28px] border border-dashed border-line-strong px-6 py-10 text-center">
-                <p className="font-semibold">No vibes here yet</p>
-                <p className="mt-1 text-sm text-muted">Be the first to share something with {circle.name}.</p>
-                <Link href={`/post?circle=${circle.id}`} className={buttonStyles({ size: "sm", className: "mt-4" })}>
-                  Post a vibe
-                </Link>
-              </div>
-            )}
-          </section>
+              </section>
+            </>
+          )}
         </div>
 
         <div className="space-y-6 lg:sticky lg:top-8 lg:self-start">

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CalendarDays, Check, Clock, Loader2, Lock, PartyPopper, Trash2 } from "lucide-react";
+import { CalendarDays, Check, Clock, Loader2, Lock, PartyPopper, Trash2, UsersRound } from "lucide-react";
 import { Avatar, AvatarStack } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
@@ -28,6 +28,7 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
   const [voting, setVoting] = useState(false);
   const [locking, setLocking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [votersOpen, setVotersOpen] = useState(false);
   const circle = getCircle(poll.circleId);
   const creator = getUser(poll.creatorId);
   const total = totalVotes(poll);
@@ -37,6 +38,12 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
   const isMine = poll.creatorId === me.id;
   const myRole = circle?.roles?.[me.id];
   const canDelete = isMine || myRole === "owner" || myRole === "admin";
+
+  /** Everyone who picked this option, you included. */
+  function votersOf(option: Poll["options"][number]) {
+    const mine = poll.myVote === option.id;
+    return [...option.voterIds.map(getUser), ...(mine ? [me] : [])].filter((u): u is User => Boolean(u));
+  }
 
   /** Shows an error (sending you to log in if needed). Returns true if there was one. */
   function failed(result: Result) {
@@ -118,7 +125,7 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
           const percent = total ? Math.round((votes / total) * 100) : 0;
           const mine = poll.myVote === option.id;
           const winner = decided && total > 0 && option.id === leader.id;
-          const voters = [...option.voterIds.map(getUser), ...(mine ? [me] : [])].filter((u): u is User => Boolean(u));
+          const voters = votersOf(option);
           const category = PLAN_CATEGORIES[option.category];
           return (
             <li key={option.id}>
@@ -156,11 +163,7 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
                 </span>
                 {showResults && (
                   <span className="relative flex shrink-0 items-center gap-2">
-                    {voters.length > 0 && (
-                      <span className="hidden sm:block">
-                        <AvatarStack users={voters} max={3} size="xs" />
-                      </span>
-                    )}
+                    {voters.length > 0 && <AvatarStack users={voters} max={3} size="xs" />}
                     <span className="w-10 text-right text-sm font-semibold tabular-nums">{percent}%</span>
                   </span>
                 )}
@@ -169,6 +172,43 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
           );
         })}
       </ul>
+
+      {showResults && total > 0 && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setVotersOpen(!votersOpen)}
+            aria-expanded={votersOpen}
+            className="flex items-center gap-1.5 text-xs font-medium text-brand-soft hover:underline"
+          >
+            <UsersRound className="h-3.5 w-3.5" aria-hidden />
+            {votersOpen ? "Hide who voted" : "See who voted"}
+          </button>
+          {votersOpen && (
+            <ul className="mt-3 space-y-3 rounded-2xl bg-elevated p-3">
+              {poll.options.map((option) => {
+                const voters = votersOf(option);
+                if (voters.length === 0) return null;
+                return (
+                  <li key={option.id}>
+                    <p className="text-xs font-semibold text-muted">
+                      {PLAN_CATEGORIES[option.category].emoji} {option.label} · {pluralize(voters.length, "vote")}
+                    </p>
+                    <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                      {voters.map((voter) => (
+                        <li key={voter.id} className="flex items-center gap-1.5 rounded-full bg-surface py-1 pl-1 pr-2.5 text-xs font-medium">
+                          <Avatar user={voter} size="xs" />
+                          {voter.id === me.id ? "You" : voter.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
 
       <footer className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
         {!decided ? (

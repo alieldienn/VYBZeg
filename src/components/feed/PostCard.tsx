@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ImageIcon, ImageOff, MapPin, MessageCircle, Trash2 } from "lucide-react";
+import { ImageIcon, ImageOff, MapPin, MessageCircle, Trash2, UsersRound } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { THEME_GRADIENTS } from "@/lib/constants";
@@ -66,6 +66,12 @@ export function PostCard({ post, author, preview = false, onChange, onRemove, cl
             <time dateTime={post.createdAt}>{post.timeLabel}</time>
           </p>
         </div>
+        {post.circleId === null && (
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-tint/[0.03] px-2.5 py-1 text-xs font-medium text-muted">
+            <UsersRound className="h-3 w-3" aria-hidden />
+            Friends
+          </span>
+        )}
         {circle &&
           (preview ? (
             <span className="flex max-w-[45%] items-center gap-1.5 rounded-full border border-line bg-tint/[0.03] px-2.5 py-1 text-xs font-medium text-muted">
@@ -179,7 +185,7 @@ export function PostCard({ post, author, preview = false, onChange, onRemove, cl
           onClose={() => setConfirmDelete(false)}
           danger
           title="Delete this vibe?"
-          description="It will be removed for everyone in the circle, together with its reactions and comments. This can't be undone."
+          description={`It will be removed for ${circle ? "everyone in the circle" : "all your friends"}, together with its reactions and comments. This can't be undone.`}
           confirmLabel="Delete"
           onConfirm={remove}
         />
