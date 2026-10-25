@@ -6,14 +6,17 @@
  * for friendly messages; they are not the security.
  */
 import { cairoDay, daysAgoIso, streakFrom } from "@/lib/dates";
+import { prepareImage } from "@/lib/images";
 import { createClient } from "@/lib/supabase/client";
-import { profileToUser } from "@/lib/supabase/avatars";
+import { circleImagePublicUrl, profileToUser } from "@/lib/supabase/avatars";
 import { failure, type Result } from "@/lib/supabase/errors";
 import type { Circle, CircleActivity, CircleInvite, CircleRole, FriendRequest, ThemeColor, User } from "@/lib/types";
 import { timeAgo } from "@/lib/utils";
 import { cleanUsernameInput, usernameError } from "@/lib/validation";
 
 const PROFILE_COLUMNS = "id, username, display_name, avatar_path, avatar_hue, bio, area";
+/** Public bucket for circle cover photos (see supabase/migrations). */
+const CIRCLE_IMAGES = "circle-images";
 
 export type SocialData = {
   /** Profiles of everyone the screens may show: friends, requests, circle members, inviters. */
@@ -32,7 +35,7 @@ export async function fetchSocial(userId: string): Promise<Result<{ data?: Socia
     supabase.from("circle_members").select("circle_id").eq("user_id", userId),
     supabase
       .from("circle_invites")
-      .select("id, circle_id, inviter_id, created_at, circles(name, emoji, color)")
+      .select("id, circle_id, inviter_id, created_at, circles(name, emoji, image_path, color)")
       .eq("invitee_id", userId)
       .order("created_at", { ascending: false }),
   ]);
@@ -44,7 +47,7 @@ export async function fetchSocial(userId: string): Promise<Result<{ data?: Socia
     ? await supabase
         .from("circles")
         .select(
-          "id, name, description, emoji, color, created_at, circle_members(user_id, role, joined_at), circle_invites(id, invitee_id, inviter_id)",
+          "id, name, description, emoji, image_path, color, created_at, circle_members(user_id, role, joined_at), circle_invites(id, invitee_id, inviter_id)",
         )
         .in("id", circleIds)
         .order("created_at", { ascending: false })
@@ -103,6 +106,7 @@ export async function fetchSocial(userId: string): Promise<Result<{ data?: Socia
       circleId: invite.circle_id,
       circleName: invite.circles!.name,
       circleEmoji: invite.circles!.emoji,
+      circleImageUrl: circleImagePublicUrl(invite.circles!.image_path),
       circleColor: invite.circles!.color as ThemeColor,
       inviterId: invite.inviter_id,
       createdAt: invite.created_at,
@@ -131,6 +135,7 @@ type CircleRow = {
   name: string;
   description: string | null;
   emoji: string;
+  image_path: string | null;
   color: string;
   created_at: string;
   circle_members: { user_id: string; role: CircleRole; joined_at: string }[];
@@ -183,6 +188,8 @@ function toCircle(row: CircleRow, posts: RecentPost[], plans: RecentPlan[], toda
     id: row.id,
     name: row.name,
     emoji: row.emoji,
+    imageUrl: circleImagePublicUrl(row.image_path),
+    imagePath: row.image_path ?? undefined,
     color: row.color as ThemeColor,
     description: row.description ?? "",
     memberIds: members.map((m) => m.user_id),
@@ -338,4 +345,55 @@ export async function deleteCircle(circleId: string): Promise<Result> {
   const { error, count } = await createClient().from("circles").delete({ count: "exact" }).eq("id", circleId);
   if (error) return failure(error);
   return count ? {} : { error: "Only the owner can delete this circle." };
+}
+
+/**
+ * Changes a circle's icon (owner and admins): its emoji, and its photo.
+ * `photo`: a new file to upload, `null` to remove the photo, or left out to keep it.
+ * The old photo is deleted once the circle points at the new one.
+ */
+export async function updateCircleIcon(
+  circle: Pick<Circle, "id" | "imagePath">,
+  { emoji, photo }: { emoji: string; photo?: File | null },
+): Promise<Result> {
+  const supabase = createClient();
+  let imagePath = circle.imagePath ?? null;
+  let uploaded: string | null = null;
+
+  if (photo) {
+    let blob: Blob;
+    try {
+      blob = await prepareImage(photo, { maxSide: 800, square: true });
+    } catch (error) {
+      return { error: (error as Error).message };
+    }
+    // Folder layout <circle>/<random>.jpg is what the storage rules check.
+    imagePath = `${circle.id}/${crypto.randomUUID()}.jpg`;
+    const upload = await supabase.storage
+      .from(CIRCLE_IMAGES)
+      .upload(imagePath, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+    if (upload.error) {
+      return /row-level security|unauthorized|403/i.test(upload.error.message)
+        ? { error: "Only the circle's owner and admins can change its photo." }
+        : { error: "The photo didn't upload. Check your connection and try again." };
+    }
+    uploaded = imagePath;
+  } else if (photo === null) {
+    imagePath = null;
+  }
+
+  const { error, count } = await supabase
+    .from("circles")
+    .update({ emoji, image_path: imagePath }, { count: "exact" })
+    .eq("id", circle.id);
+  if (error || !count) {
+    // Don't leave an unused photo behind.
+    if (uploaded) await supabase.storage.from(CIRCLE_IMAGES).remove([uploaded]);
+    if (error) return failure(error, "We couldn't save the circle's icon. Please try again.");
+    return { error: "Only the circle's owner and admins can change its icon." };
+  }
+  if (circle.imagePath && circle.imagePath !== imagePath) {
+    await supabase.storage.from(CIRCLE_IMAGES).remove([circle.imagePath]);
+  }
+  return {};
 }

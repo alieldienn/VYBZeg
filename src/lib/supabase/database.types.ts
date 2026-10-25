@@ -146,6 +146,7 @@ export type Database = {
           description: string | null
           emoji: string
           id: string
+          image_path: string | null
           name: string
         }
         Insert: {
@@ -155,6 +156,7 @@ export type Database = {
           description?: string | null
           emoji?: string
           id?: string
+          image_path?: string | null
           name: string
         }
         Update: {
@@ -164,6 +166,7 @@ export type Database = {
           description?: string | null
           emoji?: string
           id?: string
+          image_path?: string | null
           name?: string
         }
         Relationships: [
@@ -424,6 +427,7 @@ export type Database = {
         Row: {
           category: string
           detail: string | null
+          emoji: string | null
           id: string
           option_text: string
           poll_id: string
@@ -432,6 +436,7 @@ export type Database = {
         Insert: {
           category?: string
           detail?: string | null
+          emoji?: string | null
           id?: string
           option_text: string
           poll_id: string
@@ -440,6 +445,7 @@ export type Database = {
         Update: {
           category?: string
           detail?: string | null
+          emoji?: string | null
           id?: string
           option_text?: string
           poll_id?: string

@@ -6,6 +6,7 @@
  * yourself, votes can change only while a plan is open, and only the person
  * who made a plan can lock it in. The checks here are only for friendly messages.
  */
+import { PLAN_CATEGORIES } from "@/lib/constants";
 import { profileToUser } from "@/lib/supabase/avatars";
 import { createClient } from "@/lib/supabase/client";
 import { failure, type Result } from "@/lib/supabase/errors";
@@ -17,7 +18,7 @@ const PERSON_COLUMNS = "id, username, display_name, avatar_path, avatar_hue";
 
 const POLL_SELECT = `id, circle_id, creator_id, question, when_label, created_at, closes_at, closed_at,
   creator:profiles!polls_creator_id_fkey(${PERSON_COLUMNS}),
-  poll_options!poll_options_poll_id_fkey(id, option_text, category, detail, position),
+  poll_options!poll_options_poll_id_fkey(id, option_text, category, detail, emoji, position),
   poll_votes!poll_votes_poll_id_fkey(user_id, option_id, voter:profiles!poll_votes_user_id_fkey(${PERSON_COLUMNS}))`;
 
 const CLOSED_MESSAGE = "Voting on this plan has closed.";
@@ -76,6 +77,7 @@ export async function fetchPolls(
           id: option.id,
           label: option.option_text,
           category: option.category as PlanCategory,
+          emoji: option.emoji ?? PLAN_CATEGORIES[option.category as PlanCategory]?.emoji ?? "✨",
           detail: option.detail ?? undefined,
           voterIds: voters.get(option.id) ?? [],
         })),
@@ -90,7 +92,7 @@ export type NewPoll = {
   circleId: string;
   question: string;
   whenLabel: string;
-  options: { label: string; category: PlanCategory; detail?: string }[];
+  options: { label: string; category: PlanCategory; emoji: string; detail?: string }[];
 };
 
 /** Saves a plan and its options together (all or nothing). */
@@ -103,6 +105,7 @@ export async function createPoll(input: NewPoll): Promise<Result<{ id?: string }
     p_options: input.options.map((option) => ({
       text: option.label.trim(),
       category: option.category,
+      emoji: option.emoji,
       detail: option.detail ?? null,
     })),
   });

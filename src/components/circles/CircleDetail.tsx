@@ -11,6 +11,7 @@ import {
   Loader2,
   LogOut,
   MessagesSquare,
+  Pencil,
   PenLine,
   Sparkles,
   Trash2,
@@ -37,6 +38,8 @@ import { useVybz } from "@/lib/store";
 import type { ActivityKind, Circle, CircleInvite, CircleRole, ReactionKey, User } from "@/lib/types";
 import { agoText, cn, pluralize, reactionCount } from "@/lib/utils";
 import { CircleChat } from "./CircleChat";
+import { CircleIcon } from "./CircleIcon";
+import { EditCircleIconSheet } from "./EditCircleIconSheet";
 import { InviteSheet } from "./InviteSheet";
 
 const ACTIVITY_ICONS: Record<ActivityKind, LucideIcon> = {
@@ -105,9 +108,13 @@ function InvitePreview({ invite }: { invite: CircleInvite }) {
     <div className="mx-auto w-full max-w-xl">
       <PageHeader title={invite.circleName} back={{ href: "/circles", label: "Circles" }} />
       <section className={cn("rounded-[32px] p-6 text-center sm:p-8", THEME_GRADIENTS[invite.circleColor])}>
-        <span className="text-6xl drop-shadow-lg" aria-hidden>
-          {invite.circleEmoji}
-        </span>
+        <CircleIcon
+          emoji={invite.circleEmoji}
+          imageUrl={invite.circleImageUrl}
+          size="h-24 w-24"
+          emojiSize="text-6xl"
+          className="mx-auto"
+        />
         <h2 className="mt-3 font-display text-2xl font-bold text-white">{invite.circleName}</h2>
         <p className="mt-2 text-sm font-medium text-white/90">
           {inviter ? `${inviter.name} (@${inviter.username})` : "A friend"} invited you to join.
@@ -138,6 +145,9 @@ function MemberView({ circle }: { circle: Circle }) {
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [tab, setTab] = useState<"vibes" | "chat">("vibes");
+  const [editingIcon, setEditingIcon] = useState(false);
+  // A new key each time the icon sheet opens, so it starts from the current icon.
+  const [iconSheetKey, setIconSheetKey] = useState(0);
   const feed = usePosts({ circleId: circle.id });
   const plans = usePolls({ circleId: circle.id });
 
@@ -191,9 +201,22 @@ function MemberView({ circle }: { circle: Circle }) {
           {circle.emoji}
         </div>
         <div className="relative">
-          <span className="text-5xl drop-shadow-lg" aria-hidden>
-            {circle.emoji}
-          </span>
+          <div className="flex items-end gap-2">
+            <CircleIcon emoji={circle.emoji} imageUrl={circle.imageUrl} size="h-20 w-20" emojiSize="text-5xl" />
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIconSheetKey((n) => n + 1);
+                  setEditingIcon(true);
+                }}
+                className="flex items-center gap-1 rounded-full bg-black/30 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur transition hover:bg-black/45"
+              >
+                <Pencil className="h-3 w-3" aria-hidden />
+                Edit icon
+              </button>
+            )}
+          </div>
           {circle.description && (
             <p className="mt-3 max-w-md text-[15px] font-medium text-white/90 wrap-anywhere">{circle.description}</p>
           )}
@@ -417,6 +440,9 @@ function MemberView({ circle }: { circle: Circle }) {
       </div>
 
       <InviteSheet circle={circle} open={inviting} onClose={() => setInviting(false)} />
+      {isAdmin && (
+        <EditCircleIconSheet key={iconSheetKey} circle={circle} open={editingIcon} onClose={() => setEditingIcon(false)} />
+      )}
       <NewPlanSheet open={planning} onClose={() => setPlanning(false)} defaultCircleId={circle.id} />
       <ConfirmSheet
         open={confirm !== null}

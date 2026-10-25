@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { EmojiPicker } from "@/components/ui/EmojiPicker";
 import { Sheet } from "@/components/ui/Sheet";
 import { LIMITS, PLAN_CATEGORIES, PLAN_SUGGESTIONS } from "@/lib/constants";
 import { createPoll } from "@/lib/polls";
@@ -12,7 +13,10 @@ import { useVybz } from "@/lib/store";
 import type { PlanCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type DraftOption = { label: string; category: PlanCategory; detail?: string };
+type DraftOption = { label: string; category: PlanCategory; emoji: string; detail?: string };
+
+/** Emoji for ideas you type yourself (tap it to pick another). */
+const CUSTOM_OPTION_EMOJI = "✨";
 
 const WHEN_CHOICES = ["Tonight", "Tomorrow", "This weekend", "Next week"];
 
@@ -32,6 +36,8 @@ export function NewPlanSheet({
   const [when, setWhen] = useState(WHEN_CHOICES[2]);
   const [options, setOptions] = useState<DraftOption[]>([]);
   const [custom, setCustom] = useState("");
+  // Which option's emoji is being changed (its position in the list).
+  const [picking, setPicking] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Circles load after the page opens, so fall back to the first one once they arrive.
@@ -47,14 +53,25 @@ export function NewPlanSheet({
   function addCustom() {
     const label = custom.trim();
     if (!label) return;
-    addOption({ label, category: "outing" });
+    addOption({ label, category: "outing", emoji: CUSTOM_OPTION_EMOJI });
     setCustom("");
+  }
+
+  function setOptionEmoji(index: number, emoji: string) {
+    setOptions(options.map((option, i) => (i === index ? { ...option, emoji } : option)));
+    setPicking(null);
+  }
+
+  function removeOption(index: number) {
+    setOptions(options.filter((_, i) => i !== index));
+    setPicking(null);
   }
 
   function reset() {
     setQuestion("");
     setOptions([]);
     setCustom("");
+    setPicking(null);
     setWhen(WHEN_CHOICES[2]);
   }
 
@@ -152,21 +169,41 @@ export function NewPlanSheet({
           {options.length > 0 && (
             <ul className="mb-3 space-y-2">
               {options.map((option, index) => (
-                <li key={option.label} className="flex items-center gap-3 rounded-2xl border border-line bg-elevated p-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-raised text-lg" aria-hidden>
-                    {PLAN_CATEGORIES[option.category].emoji}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{option.label}</span>
-                  <button
-                    type="button"
-                    onClick={() => setOptions(options.filter((_, i) => i !== index))}
-                    className="rounded-full p-1.5 text-subtle transition hover:bg-tint/5 hover:text-fg"
-                    aria-label={`Remove ${option.label}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                <li key={option.label} className="rounded-2xl border border-line bg-elevated p-2.5">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPicking(picking === index ? null : index)}
+                      aria-expanded={picking === index}
+                      aria-label={`Change the emoji for ${option.label} (now ${option.emoji})`}
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg transition",
+                        picking === index ? "bg-brand/20 ring-2 ring-brand/60" : "bg-raised hover:ring-2 hover:ring-line-strong",
+                      )}
+                    >
+                      {option.emoji}
+                    </button>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{option.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeOption(index)}
+                      className="rounded-full p-1.5 text-subtle transition hover:bg-tint/5 hover:text-fg"
+                      aria-label={`Remove ${option.label}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {picking === index && (
+                    <EmojiPicker
+                      label={`Emoji for ${option.label}`}
+                      value={option.emoji}
+                      onChange={(emoji) => setOptionEmoji(index, emoji)}
+                      className="mt-3 border-t border-line pt-3"
+                    />
+                  )}
                 </li>
               ))}
+              <li className="px-1 text-xs text-subtle">Tap an emoji to pick your own.</li>
             </ul>
           )}
 
@@ -176,7 +213,7 @@ export function NewPlanSheet({
                 key={suggestion.label}
                 type="button"
                 disabled={full}
-                onClick={() => addOption(suggestion)}
+                onClick={() => addOption({ ...suggestion, emoji: PLAN_CATEGORIES[suggestion.category].emoji })}
                 className="flex items-center gap-1.5 rounded-full border border-dashed border-line-strong px-3 py-1.5 text-sm text-muted transition hover:border-brand/60 hover:text-fg disabled:opacity-40"
               >
                 <span aria-hidden>{PLAN_CATEGORIES[suggestion.category].emoji}</span>

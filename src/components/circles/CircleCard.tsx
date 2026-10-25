@@ -7,6 +7,7 @@ import { THEME_GRADIENTS } from "@/lib/constants";
 import { useVybz } from "@/lib/store";
 import type { Circle, User } from "@/lib/types";
 import { agoText, cn, pluralize } from "@/lib/utils";
+import { CircleIcon } from "./CircleIcon";
 
 export function CircleCard({ circle }: { circle: Circle }) {
   const { me, getUser } = useVybz();
@@ -20,9 +21,13 @@ export function CircleCard({ circle }: { circle: Circle }) {
       className="group block overflow-hidden rounded-[28px] border border-line bg-surface transition-all duration-300 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[0_20px_50px_-20px_rgb(139_92_246/0.35)]"
     >
       <div className={cn("relative flex h-28 items-end justify-between p-4", THEME_GRADIENTS[circle.color])}>
-        <span className="text-5xl drop-shadow-lg transition-transform duration-300 group-hover:scale-110" aria-hidden>
-          {circle.emoji}
-        </span>
+        <CircleIcon
+          emoji={circle.emoji}
+          imageUrl={circle.imageUrl}
+          size="h-16 w-16"
+          emojiSize="text-5xl"
+          className="transition-transform duration-300 group-hover:scale-110"
+        />
         {circle.streak > 0 && (
           <span className="flex items-center gap-1 rounded-full bg-black/35 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
             <Flame className="h-3.5 w-3.5 text-warning" aria-hidden />

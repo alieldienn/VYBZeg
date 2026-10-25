@@ -9,6 +9,7 @@ import { acceptInvite, cancelInvite } from "@/lib/social";
 import { useVybz } from "@/lib/store";
 import type { CircleInvite } from "@/lib/types";
 import { cn, pluralize, timeAgo, agoText } from "@/lib/utils";
+import { CircleIcon } from "./CircleIcon";
 
 /** Circle invites waiting for you, plus a nudge about friend requests. */
 export function InvitesPanel() {
@@ -59,12 +60,16 @@ function InviteRow({ invite }: { invite: CircleInvite }) {
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-[22px] border border-line bg-surface p-3">
-      <span
-        className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl", THEME_GRADIENTS[invite.circleColor])}
-        aria-hidden
-      >
-        {invite.circleEmoji}
-      </span>
+      {invite.circleImageUrl ? (
+        <CircleIcon emoji={invite.circleEmoji} imageUrl={invite.circleImageUrl} size="h-11 w-11" emojiSize="text-xl" className="ring-0" />
+      ) : (
+        <span
+          className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl", THEME_GRADIENTS[invite.circleColor])}
+          aria-hidden
+        >
+          {invite.circleEmoji}
+        </span>
+      )}
       <p className="min-w-0 flex-1 text-sm leading-snug">
         <span className="font-semibold">{inviter?.name.split(" ")[0] ?? "A friend"}</span> invited you to{" "}
         <Link href={`/circles/${invite.circleId}`} className="font-semibold hover:underline">

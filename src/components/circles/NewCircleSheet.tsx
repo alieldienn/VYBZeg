@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { EmojiPicker } from "@/components/ui/EmojiPicker";
 import { Sheet } from "@/components/ui/Sheet";
 import { CIRCLE_EMOJIS, LIMITS, THEME_GRADIENTS, THEME_LABELS } from "@/lib/constants";
 import { createCircle } from "@/lib/social";
@@ -106,24 +107,9 @@ export function NewCircleSheet({ open, onClose }: { open: boolean; onClose: () =
         </label>
 
         <div>
-          <p className="mb-2 text-sm font-medium">Emoji</p>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Emoji">
-            {CIRCLE_EMOJIS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                role="radio"
-                aria-checked={emoji === option}
-                onClick={() => setEmoji(option)}
-                className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-2xl border text-xl transition-all",
-                  emoji === option ? "border-brand bg-brand/15" : "border-line bg-elevated hover:border-line-strong",
-                )}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
+          <p className="mb-2 text-sm font-medium">Icon</p>
+          <EmojiPicker label="Circle icon" value={emoji} onChange={setEmoji} />
+          <p className="mt-2 text-xs text-subtle">You can add a photo instead once the circle is created.</p>
         </div>
 
         <div>

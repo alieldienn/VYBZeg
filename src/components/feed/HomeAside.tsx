@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { PLAN_CATEGORIES } from "@/lib/constants";
 import { usePolls } from "@/lib/hooks/usePolls";
 import { useVybz } from "@/lib/store";
 import { leadingOption, optionVotes, totalVotes } from "@/lib/utils";
@@ -47,7 +46,7 @@ export function HomeAside() {
                   <p className="mt-1 text-sm font-semibold leading-snug wrap-anywhere">{poll.question}</p>
                   <p className="mt-2 text-xs text-muted">
                     {total > 0
-                      ? `Leading: ${PLAN_CATEGORIES[leader.category].emoji} ${leader.label} · ${Math.round((optionVotes(poll, leader) / total) * 100)}%`
+                      ? `Leading: ${leader.emoji} ${leader.label} · ${Math.round((optionVotes(poll, leader) / total) * 100)}%`
                       : `No votes yet · ${poll.deadlineLabel.toLowerCase()}`}
                   </p>
                 </Link>

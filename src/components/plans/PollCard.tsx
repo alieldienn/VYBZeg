@@ -152,7 +152,7 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
                   style={{ width: showResults ? `${percent}%` : "0%" }}
                 />
                 <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-elevated text-xl" aria-hidden>
-                  {category.emoji}
+                  {option.emoji}
                 </span>
                 <span className="relative min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 text-sm font-semibold">
@@ -192,7 +192,7 @@ export function PollCard({ poll, showCircle = true, onChange }: PollCardProps) {
                 return (
                   <li key={option.id}>
                     <p className="text-xs font-semibold text-muted">
-                      {PLAN_CATEGORIES[option.category].emoji} {option.label} · {pluralize(voters.length, "vote")}
+                      {option.emoji} {option.label} · {pluralize(voters.length, "vote")}
                     </p>
                     <ul className="mt-1.5 flex flex-wrap gap-1.5">
                       {voters.map((voter) => (

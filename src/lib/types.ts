@@ -80,6 +80,10 @@ export type Circle = {
   id: string;
   name: string;
   emoji: string;
+  /** Cover photo chosen by the owner or an admin. Shown instead of the emoji. */
+  imageUrl?: string;
+  /** Where the photo lives in storage (needed to replace or remove it). */
+  imagePath?: string;
   color: ThemeColor;
   description: string;
   memberIds: string[];
@@ -101,6 +105,7 @@ export type CircleInvite = {
   circleId: string;
   circleName: string;
   circleEmoji: string;
+  circleImageUrl?: string;
   circleColor: ThemeColor;
   inviterId: string;
   createdAt: string;
@@ -127,6 +132,8 @@ export type PollOption = {
   id: string;
   label: string;
   category: PlanCategory;
+  /** The emoji its creator picked (or the category's emoji for older plans). */
+  emoji: string;
   detail?: string;
   /** Votes from other people. The current user's vote is stored on the poll. */
   voterIds: string[];
